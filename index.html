@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description"
+  content="A live 2D FFT as an educational tool for understanding diffraction" />
+  <meta name='copyright' content='J Stratford'>
+  <title>Live Fourier Transform</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <main class="dashboard">
+    <div class="row">
+      <div class="input-container square output">
+        <canvas id="inputCanvas" class="input"></canvas>
+        <!-- video -->
+      </div>
+      <canvas id="gpuCanvas" class="square output"></canvas>
+    </div>
+    <div class="row">
+      <canvas id="integrationCanvas" class="output"></canvas>
+    </div>
+  </main>
+
+  <button id="settingsBtn" class="btn-primary" popovertarget="settingsMenu" aria-label="Settings">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </button>
+
+  <div id="settingsMenu" popover>
+    <h3>Configuration</h3>
+    <section>
+      <label>Source Mode</label>
+      <select id="sourceSelect">
+        <option default value="generator">Example Images</option>
+        <option value="camera">Live Camera</option>
+      </select>
+    </section>
+    <section id="cameraSection" style="display: none;">
+      <label>Camera</label>
+      <select id="videoDevices"></select>
+    </section>
+    <section id="generatorSection">
+      <label>Pattern</label>
+      <select id="patternSelect"></select>
+    </section>
+  </div>
+
+  <div id="errorOverlay" class="error-overlay hidden">
+    <div class="error-card">
+      <h2 id="errorTitle">Error</h2>
+      <p id="errorMessage">An unexpected error occurred.</p>
+      <code id="errorCode" class="hidden"></code>
+    </div>
+  </div>
+
+  <footer>
+    <p>J Stratford 2026</p>
+  </footer>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
