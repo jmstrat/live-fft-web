@@ -34,7 +34,7 @@ async function init() {
   elements.input.width = elements.input.height = SIZE
   elements.output.width = elements.output.height = SIZE
   elements.integ.width = SIZE
-  elements.integ.height = SIZE / 4
+  elements.integ.height = SIZE / 2
 
   try {
     await gpu.init(elements.output, elements.integ, SIZE)
