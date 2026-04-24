@@ -17,6 +17,7 @@ const state = {
 }
 
 const elements = {
+  loading: document.getElementById('loading'),
   input: document.getElementById('inputCanvas'),
   output: document.getElementById('gpuCanvas'),
   integ: document.getElementById('integrationCanvas'),
@@ -42,6 +43,8 @@ async function init() {
   } catch (err) {
     showError(err)
     return
+  } finally {
+    loading.classList.add('hidden')
   }
 
   loop()

@@ -114,7 +114,7 @@ select {
   border: 1px solid #444;
 }
 
-.error-overlay {
+.overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -130,27 +130,26 @@ select {
   text-align: center;
 }
 
-.error-card {
+.card {
   background: var(--panel-color);
   padding: 2rem;
   border-radius: 12px;
-  border: 1px solid #ff4444;
+  border: 1px solid #000;
   max-width: 500px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
 }
 
-.error-card h2 {
-  color: #ff4444;
+.card h2 {
   margin-top: 0;
 }
 
-.error-card p {
+.card p {
   line-height: 1.6;
   color: #ccc;
   white-space: pre-line;
 }
 
-.error-card code {
+.card code {
   background: #000;
   padding: 0.5rem;
   margin-top: 1rem;
@@ -161,6 +160,22 @@ select {
 
 .hidden {
   display: none;
+}
+
+.card.error {
+  border: 1px solid #ff4444;
+}
+
+.card.error h2 {
+  color: #ff4444;
+}
+
+.card.message {
+  border: 1px solid #4444ff;
+}
+
+.card.message h2 {
+  color: #4444ff;
 }
 
 footer {
