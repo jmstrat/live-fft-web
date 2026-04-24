@@ -37,33 +37,12 @@ async function init() {
   elements.integ.height = SIZE / 2
 
   try {
+    await setupUI()
     await gpu.init(elements.output, elements.integ, SIZE)
   } catch (err) {
-    console.error(err)
-    let title = "Application Error"
-    let message = "An unexpected error occurred while starting the dashboard."
-
-    switch (err.code) {
-      case 'WEBGPU_MISSING':
-        title = "Browser Update Required"
-        message = "Your browser doesn't support WebGPU. Try updating to a newer version."
-        break
-      case 'WEBGPU_ADAPTER_MISSING':
-        title = "Graphics Card Issue"
-        message = "We couldn't find a compatible graphics card. Make sure your drivers are up to date."
-        break
-      case 'LIMITS_UNSUPPORTED':
-        title = "Hardware Unsupported"
-        message = "Your GPU may not be powerful enough to run at this resolution."
-        break
-      default:
-        message = `${message}\n${err.message}.`
-    }
-    showError(title, message)
+    showError(err)
     return
   }
-
-  await setupUI()
 
   loop()
 }
@@ -117,7 +96,7 @@ async function startCamera () {
     elements.input.parentElement.appendChild(state.videoElement)
     state.videoElement.play()
   } catch (err) {
-    console.error("Camera error:", err)
+    showError(err)
   }
 }
 
@@ -161,7 +140,37 @@ async function loop() {
   requestAnimationFrame(loop)
 }
 
-function showError (title, message, code = "") {
+function showError (err) {
+  console.error(err)
+  let title = "Application Error"
+  let message = "An unexpected error occurred."
+  let code
+
+  switch (err.code || err.name) {
+    case 'WEBGPU_MISSING':
+      title = "Browser Update Required"
+      message = "Your browser doesn't support WebGPU. Try updating to a newer version."
+      break
+    case 'WEBGPU_ADAPTER_MISSING':
+      title = "Graphics Card Issue"
+      message = "We couldn't find a compatible graphics card. Make sure your drivers are up to date."
+      break
+    case 'LIMITS_UNSUPPORTED':
+      title = "Hardware Unsupported"
+      message = "Your GPU may not be powerful enough to run at this resolution."
+      break
+    case 'OverconstrainedError':
+      title = "Camera Error"
+      message = "Unable to capture images from your camera at the required resolution."
+      break
+    default:
+      message = `${message}\n${err.message || err.name}.`
+      code = err.code
+  }
+  _showError(title, message, code)
+}
+
+function _showError (title, message, code = "") {
   const overlay = document.getElementById('errorOverlay')
   const titleEl = document.getElementById('errorTitle')
   const msgEl = document.getElementById('errorMessage')
