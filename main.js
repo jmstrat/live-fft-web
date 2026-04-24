@@ -87,7 +87,8 @@ async function startCamera () {
     video: {
       width: { ideal: SIZE },
       height: { ideal: SIZE },
-      aspectRatio: { ideal: 1 },
+      aspectRatio: { exact: 1 },
+      resizeMode: 'crop-and-scale',
       ...(state.deviceId && { deviceId: { exact: state.deviceId } })
     }
   }
