@@ -25,7 +25,8 @@ const elements = {
   patternSelect: document.getElementById('patternSelect'),
   videoDevices: document.getElementById('videoDevices'),
   camSection: document.getElementById('cameraSection'),
-  genSection: document.getElementById('generatorSection')
+  genSection: document.getElementById('generatorSection'),
+  fullscreenBtn: document.getElementById('fullscreen-btn')
 }
 
 const gpu = new FFTWebGPU()
@@ -80,6 +81,18 @@ async function setupUI () {
     state.deviceId = e.target.value
     startCamera()
   }
+
+  elements.fullscreenBtn.addEventListener('click', async () => {
+    if (!document.fullscreenElement) {
+      try {
+        await document.body.requestFullscreen()
+      } catch (err) {
+        console.error(err)
+      }
+    } else {
+      document.exitFullscreen()
+    }
+  })
 }
 
 async function startCamera () {
