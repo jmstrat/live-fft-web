@@ -21,15 +21,21 @@
     </div>
   </main>
 
-  <button id="settingsBtn" class="btn-primary" popovertarget="settingsMenu" aria-label="Settings">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-      <line x1="3" y1="12" x2="21" y2="12"></line>
-      <line x1="3" y1="6" x2="21" y2="6"></line>
-      <line x1="3" y1="18" x2="21" y2="18"></line>
-    </svg>
-  </button>
+  <div class="buttons-container">
+    <button id="settingsBtn" class="btn" popovertarget="settingsMenu" aria-label="Settings">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
 
-  <div id="settingsMenu" popover>
+    <button id="helpBtn" class="btn" popovertarget="helpPopover" aria-label="Help">
+      ?
+    </button>
+  </div>
+
+  <div id="settingsMenu" class="popup" popover>
     <h3>Configuration</h3>
     <section>
       <label>Source Mode</label>
@@ -45,6 +51,50 @@
     <section id="generatorSection">
       <label>Pattern</label>
       <select id="patternSelect"></select>
+    </section>
+  </div>
+
+  <div id="helpPopover" class="popup" popover>
+    <h3>Help</h3>
+    <section>
+      <h4>What am I looking at?</h4>
+      <p>
+        The screen is split into three sections:
+        <ul>
+          <li>
+            On the left is the input image, you can choose in the settings menu
+            whether this is a Live capture from your webcam, or one of the sample
+            images included with this program. 
+          </li>
+          <li>
+            On the right is the live Fourier transformed version of that image. It
+            displays the magnitude of the fourier transform with a logarithmic
+            scaling.
+          </li>
+          <li>
+            Below is the radial integration of the Fourier transformed image. The
+            x-axis shows distance from the centre, and the y-axis is the intensity.
+          </li>
+        </ul>
+      </p>
+    </section>
+
+    <section>
+      <h4>Why would I want to see this?</h4>
+      <p>
+        If you imagine the input image to be an atomic structure,
+        the Fourier transform shows what X-rays would do to it:
+        When X-rays interact with matter, they create an interference pattern.
+        This pattern is the magnitude of the Fourier transform of the electron
+        density structure in the matter, and is what we measure in an X-ray
+        diffraction experiment.
+      </p>
+      <p>
+        You can use this tool to demonstrate what X-ray scattering / diffraction
+        would look like for a variety of different structures. Simply hold a piece
+        of paper with a structure on it to the camera and see the Fourier transform
+        live. There are also a variety of examples built-in to the program.
+      </p>
     </section>
   </div>
 

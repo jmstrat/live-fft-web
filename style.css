@@ -58,24 +58,43 @@ body {
   width: 100%;
 }
 
-#settingsBtn {
+.buttons-container {
   position: fixed;
   top: var(--margin);
   right: var(--margin);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn {
+  width: 3rem;
+  height: 3rem;
   padding: 0.6rem;
+  margin-bottom: 0.6rem;
   background: var(--accent-color);
   color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-weight: 600;
+  font-size: 1.5em;
   z-index: 100;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
-#settingsMenu {
+#settingsBtn {
+  anchor-name: --anchor-settings;
+}
+
+#helpBtn {
+  anchor-name: --anchor-help;
+}
+
+.popup {
   position: fixed;
   padding: 1.5rem;
   border-radius: 12px;
@@ -83,16 +102,28 @@ body {
   background: var(--panel-color);
   color: var(--text-color);
   width: 280px;
+  margin: 0;
+  inset: auto;
 
-  margin-top: 4.5rem;
-  margin-right: var(--margin);
+  top: anchor(bottom); 
+  right: anchor(right);
+  margin-top: 0.5rem;
 }
 
-#settingsMenu section {
+#settingsMenu {
+  position-anchor: --anchor-settings;
+}
+
+#helpPopover {
+  position-anchor: --anchor-help;
+  width: 500px;
+}
+
+.popup section {
   margin-bottom: 1.2rem;
 }
 
-label {
+.popup section label {
   display: block;
   font-size: 0.85rem;
   color: #aaa;
