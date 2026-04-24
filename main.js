@@ -24,6 +24,7 @@ const elements = {
   sourceSelect: document.getElementById('sourceSelect'),
   patternSelect: document.getElementById('patternSelect'),
   videoDevices: document.getElementById('videoDevices'),
+  colourMap: document.getElementById('colourMap'),
   camSection: document.getElementById('cameraSection'),
   genSection: document.getElementById('generatorSection'),
   fullscreenBtn: document.getElementById('fullscreen-btn')
@@ -80,6 +81,10 @@ async function setupUI () {
   elements.videoDevices.onchange = (e) => {
     state.deviceId = e.target.value
     startCamera()
+  }
+
+  elements.colourMap.onchange = (e) => {
+    gpu.setColourMap(parseInt(e.target.value))
   }
 
   elements.fullscreenBtn.addEventListener('click', async () => {

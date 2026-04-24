@@ -59,6 +59,11 @@ export class FFTWebGPU {
     this.makePipelines()
   }
 
+  setColourMap (idx) {
+    const arr = new Uint32Array([idx])
+    this.device.queue.writeBuffer(this.buffers.magnitudeUniforms, 0, arr)
+  }
+
   makeResources () {
     const createTexture = (
       format,
@@ -100,8 +105,13 @@ export class FFTWebGPU {
       global_max: this.device.createBuffer({
         size: 4,
         usage: GPUBufferUsage.STORAGE
+      }),
+      magnitudeUniforms: this.device.createBuffer({
+        size: 4,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
       })
     }
+    this.setColourMap(0)
   }
 
   async compileShaders () {
@@ -174,7 +184,8 @@ export class FFTWebGPU {
       entries: [
         { binding: 0, resource: this.views.fft[0] },
         { binding: 1, resource: this.views.fft[1] },
-        { binding: 2, resource: this.views.output }
+        { binding: 2, resource: this.views.output },
+        { binding: 3, resource: { buffer: this.buffers.magnitudeUniforms } }
       ]
     })
 
