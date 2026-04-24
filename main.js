@@ -29,9 +29,10 @@ const elements = {
 }
 
 const gpu = new FFTWebGPU()
-const ctx = elements.input.getContext('2d', { willReadFrequently: true })
+const generatorCanvas = new OffscreenCanvas(SIZE, SIZE)
+const ctx = generatorCanvas.getContext('2d', { willReadFrequently: true })
 
-async function init() {
+async function init () {
   elements.input.width = elements.input.height = SIZE
   elements.output.width = elements.output.height = SIZE
   elements.integ.width = SIZE
@@ -39,7 +40,7 @@ async function init() {
 
   try {
     await setupUI()
-    await gpu.init(elements.output, elements.integ, SIZE)
+    await gpu.init(elements.input, elements.output, elements.integ, SIZE)
   } catch (err) {
     showError(err)
     return
@@ -67,7 +68,6 @@ async function setupUI () {
     const is_camera = state.sourceMode === 'camera'
     elements.camSection.style.display = is_camera ? 'block' : 'none'
     elements.genSection.style.display = is_camera ? 'none' : 'block'
-    elements.input.style.display = is_camera ? 'none' : 'block'
     if (is_camera) {
       startCamera()
     } else {
@@ -96,8 +96,6 @@ async function startCamera () {
   try {
     const stream = await navigator.mediaDevices.getUserMedia(constraints)
     state.videoElement.srcObject = stream
-    state.videoElement.classList.add('input')
-    elements.input.parentElement.appendChild(state.videoElement)
     state.videoElement.play()
   } catch (err) {
     showError(err)
@@ -111,11 +109,10 @@ async function stopCamera () {
     tracks.forEach(track => track.stop())
     state.videoElement.srcObject = null
     state.videoElement.load()
-    state.videoElement.remove()
   }
 }
 
-async function loop() {
+async function loop () {
   let source
   if (state.sourceMode === 'camera') {
     if (state.videoElement.readyState < 2) {
@@ -136,7 +133,7 @@ async function loop() {
   } else {
     clearCanvas(ctx)
     Generators[state.currentPattern](ctx)
-    source = elements.input
+    source = generatorCanvas
   }
 
   gpu.render(source)

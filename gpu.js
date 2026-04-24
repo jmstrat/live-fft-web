@@ -13,7 +13,7 @@
 const RADIX = 4
 
 export class FFTWebGPU {
-  async init (ftCanvas, integrationCanvas, size) {
+  async init (inputCanvas, ftCanvas, integrationCanvas, size) {
     this.size = size
     // This is just for the integration, we don't include the corners
     this.maxR = (size / 2) - 1
@@ -44,6 +44,9 @@ export class FFTWebGPU {
     }
 
     this.format = navigator.gpu.getPreferredCanvasFormat()
+
+    this.ctxInput = inputCanvas.getContext('webgpu')
+    this.ctxInput.configure({ device: this.device, format: this.format })
 
     this.ctxFFT = ftCanvas.getContext('webgpu')
     this.ctxFFT.configure({ device: this.device, format: this.format })
@@ -233,7 +236,26 @@ export class FFTWebGPU {
       }
     })
 
-    this.renderBindGroup = this.device.createBindGroup({
+    const sampler = this.device.createSampler({
+      magFilter: "linear",
+      minFilter: "linear"
+    })
+
+    this.renderInputBindGroup = this.device.createBindGroup({
+      layout: this.renderPipeline.getBindGroupLayout(0),
+      entries: [
+        {
+          binding: 0,
+          resource: this.views.input
+        },
+        {
+          binding: 1,
+          resource: sampler
+        }
+      ]
+    })
+
+    this.renderFFTBindGroup = this.device.createBindGroup({
       layout: this.renderPipeline.getBindGroupLayout(0),
       entries: [
         {
@@ -242,10 +264,7 @@ export class FFTWebGPU {
         },
         {
           binding: 1,
-          resource: this.device.createSampler({
-            magFilter: "linear",
-            minFilter: "linear"
-          })
+          resource: sampler
         }
       ]
     })
@@ -283,6 +302,22 @@ export class FFTWebGPU {
     )
 
     const encoder = this.device.createCommandEncoder()
+
+    {
+      const pass = encoder.beginRenderPass({
+        colorAttachments: [{
+          view: this.ctxInput.getCurrentTexture().createView(),
+          loadOp: "clear",
+          storeOp: "store"
+        }]
+      })
+
+      pass.setPipeline(this.renderPipeline)
+      pass.setBindGroup(0, this.renderInputBindGroup)
+      pass.draw(3)
+      pass.end()
+    }
+
     {
       const pass = encoder.beginComputePass()
       pass.setPipeline(this.convertPipeline)
@@ -331,7 +366,7 @@ export class FFTWebGPU {
       })
 
       pass.setPipeline(this.renderPipeline)
-      pass.setBindGroup(0, this.renderBindGroup)
+      pass.setBindGroup(0, this.renderFFTBindGroup)
       pass.draw(3)
       pass.end()
     }
