@@ -68,6 +68,17 @@ export class FFTWebGPU {
     this.device.queue.writeBuffer(this.buffers.magnitudeUniforms, 0, arr)
   }
 
+  setMagnitudeScale (x) {
+    if (isNaN(x)) {
+      x = 0.25
+    } else if (x <= 0) {
+      x = 0.01
+    }
+
+    const arr = new Float32Array([x])
+    this.device.queue.writeBuffer(this.buffers.magnitudeUniforms, 4, arr)
+  }
+
   makeResources () {
     const createTexture = (
       format,
@@ -111,7 +122,7 @@ export class FFTWebGPU {
         usage: GPUBufferUsage.STORAGE
       }),
       magnitudeUniforms: this.device.createBuffer({
-        size: 4,
+        size: 8,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
       })
     }

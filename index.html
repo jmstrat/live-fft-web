@@ -72,6 +72,11 @@
         <option default value="5">Cividis</option>
       </select>
     </section>
+
+    <section>
+      <label>Intensity Scale</label>
+      <input type="range" id="scale" min="1" max="100" value="25"  step="1">
+    </section>
   </div>
 
   <div id="helpPopover" class="popup" popover>
@@ -84,7 +89,7 @@
           <li>
             On the left is the input image, you can choose in the settings menu
             whether this is a Live capture from your webcam, or one of the sample
-            images included with this program. 
+            images included with this program.
           </li>
           <li>
             On the right is the live Fourier transformed version of that image. It

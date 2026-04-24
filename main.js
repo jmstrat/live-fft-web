@@ -13,7 +13,8 @@ const STORE = {
   SOURCE: 'source',
   CAMERA: 'camera',
   GENERATOR: 'generator',
-  COLOUR_MAP: 'colour-map'
+  COLOUR_MAP: 'colour-map',
+  INTENSITY_SCALE: 'intensity-scale'
 }
 
 const SOURCES = {
@@ -25,7 +26,8 @@ const state = {
   sourceMode: localStorage.getItem(STORE.SOURCE) ?? SOURCES.GENERATOR,
   deviceId: localStorage.getItem(STORE.CAMERA) ?? null,
   currentPattern: localStorage.getItem(STORE.GENERATOR) ?? Object.keys(Generators)[0],
-  colourMap: localStorage.getItem(STORE.COLOUR_MAP) ?? 0
+  colourMap: localStorage.getItem(STORE.COLOUR_MAP) ?? 0,
+  intensityScale: localStorage.getItem(STORE.INTENSITY_SCALE) ?? 0.25,
 }
 
 const elements = {
@@ -39,6 +41,7 @@ const elements = {
   patternSelect: document.getElementById('patternSelect'),
   videoDevices: document.getElementById('videoDevices'),
   colourMap: document.getElementById('colourMap'),
+  intensityScale: document.getElementById('scale'),
 
   // Input sections
   camSection: document.getElementById('cameraSection'),
@@ -72,6 +75,7 @@ async function init () {
     await setupUI()
     await gpu.init(elements.input, elements.output, elements.integ, SIZE)
     gpu.setColourMap(state.colourMap)
+    gpu.setMagnitudeScale(state.intensityScale)
   } catch (err) {
     showError(err)
     return
@@ -109,7 +113,7 @@ async function setupUI () {
     state.deviceId = e.target.value
     startCamera()
   })
-  
+
   // Source mode selection
   async function changeSourceMode (mode) {
     state.sourceMode = mode
@@ -134,6 +138,14 @@ async function setupUI () {
     localStorage.setItem(STORE.COLOUR_MAP, state.colourMap)
   })
   elements.colourMap.value = state.colourMap
+
+  elements.intensityScale.addEventListener('change', e => {
+    const percent = e.target.value
+    state.intensityScale = percent / 100
+    gpu.setMagnitudeScale(state.intensityScale)
+    localStorage.setItem(STORE.INTENSITY_SCALE, state.intensityScale)
+  })
+  elements.intensityScale.value = state.intensityScale * 100
 
   // Fullscreen
   elements.fullscreenBtn.addEventListener('click', async () => {

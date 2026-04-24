@@ -139,6 +139,40 @@ select {
   border: 1px solid #444;
 }
 
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]:focus { outline: none; }
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 8px; background: #2c313a; border: 1px solid #444; border-radius: 4px;
+}
+
+input[type="range"]::-moz-range-track {
+  height: 8px; background: #2c313a; border: 1px solid #444; border-radius: 4px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 18px; width: 18px; border-radius: 50%;
+  background: #61afef; margin-top: -6px; border: none;
+}
+
+input[type="range"]::-moz-range-thumb {
+  height: 18px; width: 18px; border-radius: 50%;
+  background: #61afef; border: none;
+}
+
+input[type="range"]:focus::-webkit-slider-runnable-track { border-color: #61afef; }
+input[type="range"]:focus::-moz-range-track { border-color: #61afef; }
+input[type="range"]::-moz-focus-outer { border: 0; }
+
+
 .overlay {
   position: fixed;
   top: 0;
