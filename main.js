@@ -9,25 +9,53 @@ import { Generators, clearCanvas } from './generators.js'
 
 const SIZE = 1024 // Must be a power of RADIX (default 4)
 
+const STORE = {
+  SOURCE: 'source',
+  CAMERA: 'camera',
+  GENERATOR: 'generator',
+  COLOUR_MAP: 'colour-map'
+}
+
+const SOURCES = {
+  CAMERA: 'camera',
+  GENERATOR: 'generator'
+}
+
 const state = {
-  sourceMode: 'generator',
-  deviceId: null,
-  currentPattern: Object.keys(Generators)[0],
-  videoElement: document.createElement('video')
+  sourceMode: localStorage.getItem(STORE.SOURCE) ?? SOURCES.GENERATOR,
+  deviceId: localStorage.getItem(STORE.CAMERA) ?? null,
+  currentPattern: localStorage.getItem(STORE.GENERATOR) ?? Object.keys(Generators)[0],
+  colourMap: localStorage.getItem(STORE.COLOUR_MAP) ?? 0
 }
 
 const elements = {
-  loading: document.getElementById('loading'),
+  // Canvases
   input: document.getElementById('inputCanvas'),
   output: document.getElementById('gpuCanvas'),
   integ: document.getElementById('integrationCanvas'),
+
+  // Inputs
   sourceSelect: document.getElementById('sourceSelect'),
   patternSelect: document.getElementById('patternSelect'),
   videoDevices: document.getElementById('videoDevices'),
   colourMap: document.getElementById('colourMap'),
+
+  // Input sections
   camSection: document.getElementById('cameraSection'),
   genSection: document.getElementById('generatorSection'),
-  fullscreenBtn: document.getElementById('fullscreen-btn')
+
+  // Buttons
+  fullscreenBtn: document.getElementById('fullscreen-btn'),
+
+  // Overlays
+  loading: document.getElementById('loading'),
+  errorOverlay: document.getElementById('errorOverlay'),
+  errorTitle: document.getElementById('errorTitle'),
+  errorMsg: document.getElementById('errorMessage'),
+  errorCode: document.getElementById('errorCode'),
+
+  // Offscreen
+  videoElement: document.createElement('video')
 }
 
 const gpu = new FFTWebGPU()
@@ -43,6 +71,7 @@ async function init () {
   try {
     await setupUI()
     await gpu.init(elements.input, elements.output, elements.integ, SIZE)
+    gpu.setColourMap(state.colourMap)
   } catch (err) {
     showError(err)
     return
@@ -55,47 +84,67 @@ async function init () {
 
 async function setupUI () {
   // Populate Patterns
-  elements.patternSelect.innerHTML = Object.keys(Generators)
-    .map(k => `<option value="${k}">${k}</option>`).join('')
+  const patternOptions = Object.keys(Generators).map(name => {
+    const opt = document.createElement('option')
+    opt.value = name
+    opt.textContent = name
+    return opt
+  })
+  elements.patternSelect.replaceChildren(...patternOptions)
+  elements.patternSelect.value = state.currentPattern
+  elements.patternSelect.addEventListener('change', e => {
+    state.currentPattern = e.target.value
+    localStorage.setItem(STORE.GENERATOR, state.currentPattern)
+  })
 
-  // Device Enumeration
+
+  // Populate Cameras (note as implemented this will only refresh on page load)
   const devices = await navigator.mediaDevices.enumerateDevices()
-  const cameras = devices.filter(d => d.kind === 'videoinput')
-  elements.videoDevices.innerHTML = cameras
-    .map(c => `<option value="${c.deviceId}">${c.label || 'Camera'}</option>`).join('')
-
-  // Event Handlers
-  elements.sourceSelect.onchange = (e) => {
-    state.sourceMode = e.target.value
-    const is_camera = state.sourceMode === 'camera'
-    elements.camSection.style.display = is_camera ? 'block' : 'none'
-    elements.genSection.style.display = is_camera ? 'none' : 'block'
-    if (is_camera) {
-      startCamera()
+  const deviceOptions = devices
+    .filter(({ kind }) => kind === 'videoinput')
+    .map(({ deviceId, label }) => new Option(label || 'Camera', deviceId))
+  elements.videoDevices.replaceChildren(...deviceOptions)
+  elements.videoDevices.value = state.deviceId
+  elements.videoDevices.addEventListener('change', e => {
+    state.deviceId = e.target.value
+    startCamera()
+  })
+  
+  // Source mode selection
+  async function changeSourceMode (mode) {
+    state.sourceMode = mode
+    const isCamera = mode === SOURCES.CAMERA
+    elements.camSection.classList.toggle('hidden', !isCamera)
+    elements.genSection.classList.toggle('hidden', isCamera)
+    if (isCamera) {
+      await startCamera()
     } else {
       stopCamera()
     }
+    localStorage.setItem(STORE.SOURCE, state.sourceMode)
   }
+  elements.sourceSelect.addEventListener('change', e => changeSourceMode(e.target.value))
   elements.sourceSelect.value = state.sourceMode
-  elements.patternSelect.onchange = (e) => state.currentPattern = e.target.value
-  elements.videoDevices.onchange = (e) => {
-    state.deviceId = e.target.value
-    startCamera()
-  }
+  await changeSourceMode(state.sourceMode)
 
-  elements.colourMap.onchange = (e) => {
-    gpu.setColourMap(parseInt(e.target.value))
-  }
+  // Colour map selection
+  elements.colourMap.addEventListener('change', e => {
+    state.colourMap = parseInt(e.target.value)
+    gpu.setColourMap(state.colourMap)
+    localStorage.setItem(STORE.COLOUR_MAP, state.colourMap)
+  })
+  elements.colourMap.value = state.colourMap
 
+  // Fullscreen
   elements.fullscreenBtn.addEventListener('click', async () => {
-    if (!document.fullscreenElement) {
-      try {
+    try {
+      if (!document.fullscreenElement) {
         await document.body.requestFullscreen()
-      } catch (err) {
-        console.error(err)
+      } else {
+        document.exitFullscreen()
       }
-    } else {
-      document.exitFullscreen()
+    } catch (err) {
+      console.error(err)
     }
   })
 }
@@ -107,37 +156,41 @@ async function startCamera () {
       height: { ideal: SIZE },
       aspectRatio: { exact: 1 },
       resizeMode: 'crop-and-scale',
-      ...(state.deviceId && { deviceId: { exact: state.deviceId } })
+      ...(state.deviceId && { deviceId: { ideal: state.deviceId } })
     }
   }
 
   try {
     const stream = await navigator.mediaDevices.getUserMedia(constraints)
-    state.videoElement.srcObject = stream
-    state.videoElement.play()
+    elements.videoElement.srcObject = stream
+    elements.videoElement.play()
+
+    const activeTrack = stream.getVideoTracks()[0]
+    state.deviceId = activeTrack.getSettings().deviceId
+    localStorage.setItem(STORE.CAMERA, state.deviceId)
   } catch (err) {
     showError(err)
   }
 }
 
-async function stopCamera () {
-  const stream = state.videoElement?.srcObject
+function stopCamera () {
+  const stream = elements.videoElement?.srcObject
   if (stream) {
     const tracks = stream.getTracks()
     tracks.forEach(track => track.stop())
-    state.videoElement.srcObject = null
-    state.videoElement.load()
+    elements.videoElement.srcObject = null
+    elements.videoElement.load()
   }
 }
 
 async function loop () {
   let source
-  if (state.sourceMode === 'camera') {
-    if (state.videoElement.readyState < 2) {
+  if (state.sourceMode === SOURCES.CAMERA) {
+    if (elements.videoElement.readyState < 2) {
       return requestAnimationFrame(loop)
     }
 
-    const v = state.videoElement
+    const v = elements.videoElement
     const vWidth = v.videoWidth
     const vHeight = v.videoHeight
     const inputSquareSize = Math.min(vWidth, vHeight)
@@ -190,22 +243,17 @@ function showError (err) {
 }
 
 function _showError (title, message, code = "") {
-  const overlay = document.getElementById('errorOverlay')
-  const titleEl = document.getElementById('errorTitle')
-  const msgEl = document.getElementById('errorMessage')
-  const codeEl = document.getElementById('errorCode')
-
-  titleEl.textContent = title
-  msgEl.textContent = message
+  elements.errorTitle.textContent = title
+  elements.errorMsg.textContent = message
 
   if (code) {
-    codeEl.textContent = code
-    codeEl.classList.remove('hidden')
+    elements.errorCode.textContent = code
+    elements.errorCode.classList.remove('hidden')
   } else {
-    codeEl.classList.add('hidden')
+    elements.errorCode.classList.add('hidden')
   }
 
-  overlay.classList.remove('hidden')
+  elements.errorOverlay.classList.remove('hidden')
 }
 
 init()

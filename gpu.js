@@ -60,6 +60,10 @@ export class FFTWebGPU {
   }
 
   setColourMap (idx) {
+    if (isNaN(idx) || idx < 0 || idx > 5) {
+      idx = 0
+    }
+
     const arr = new Uint32Array([idx])
     this.device.queue.writeBuffer(this.buffers.magnitudeUniforms, 0, arr)
   }
@@ -111,7 +115,6 @@ export class FFTWebGPU {
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
       })
     }
-    this.setColourMap(0)
   }
 
   async compileShaders () {
