@@ -31,9 +31,9 @@ const state = {
   currentPattern: localStorage.getItem(STORE.GENERATOR) ?? Object.keys(Generators)[0],
   convertOption: localStorage.getItem(STORE.CONVERT) ?? "PeriodicPlusSmooth",
   flipX: (localStorage.getItem(STORE.FLIP_X) ?? "false") === "true",
-  inputDisplay: localStorage.getItem(STORE.INPUT_DISPLAY) ?? "raw",
+  inputDisplay: localStorage.getItem(STORE.INPUT_DISPLAY) ?? "processed",
   colourMap: localStorage.getItem(STORE.COLOUR_MAP) ?? "None",
-  intensityScale: parseFloat(localStorage.getItem(STORE.INTENSITY_SCALE)) ?? 0.25
+  intensityScale: parseFloat(localStorage.getItem(STORE.INTENSITY_SCALE)) || 0.25
 }
 
 const elements = {
