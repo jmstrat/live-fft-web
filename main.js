@@ -188,25 +188,40 @@ async function setupUI () {
 
 async function startCamera () {
   const constraints = {
-    video: {
-      width: { ideal: SIZE },
-      height: { ideal: SIZE },
-      aspectRatio: { exact: 1 },
-      resizeMode: 'crop-and-scale',
-      ...(state.deviceId && { deviceId: { ideal: state.deviceId } })
-    }
+    width: { ideal: SIZE },
+    height: { ideal: SIZE },
+    aspectRatio: { exact: 1 },
+    resizeMode: 'crop-and-scale',
+    ...(state.deviceId && { deviceId: { exact: state.deviceId } })
   }
+  // Need to use an exact rather than ideal deviceId to allow the camera to
+  // change from the default, but this would cause an error if the stored
+  // id no-longer exists, so we retry with no device id on failure
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: constraints })
 
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia(constraints)
-    elements.videoElement.srcObject = stream
-    elements.videoElement.play()
+      elements.videoElement.srcObject = stream
+      elements.videoElement.play()
 
-    const activeTrack = stream.getVideoTracks()[0]
-    state.deviceId = activeTrack.getSettings().deviceId
-    localStorage.setItem(STORE.CAMERA, state.deviceId)
-  } catch (err) {
-    showError(err)
+      const activeTrack = stream.getVideoTracks()[0]
+      state.deviceId = activeTrack.getSettings().deviceId
+      localStorage.setItem(STORE.CAMERA, state.deviceId)
+      return
+    } catch (err) {
+      const isMissing = ['NotFoundError', 'DevicesNotFoundError'].includes(err.name)
+      const isOverconstrained = err.name === 'OverconstrainedError' && err.constraint === 'deviceId'
+
+      // Only retry if the deviceId was the problem and we haven't already tried the fallback
+      if (constraints.deviceId && (isMissing || isOverconstrained)) {
+        console.error(`Camera ${constraints.deviceId} not found`)
+        delete constraints.deviceId
+        continue
+      }
+
+      showError(err)
+      return
+    }
   }
 }
 
