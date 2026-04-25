@@ -1,11 +1,12 @@
 @group(0) @binding(0) var src: texture_2d<f32>;
 @group(0) @binding(1) var dst: texture_storage_2d<rg32float, write>;
-@group(0) @binding(3) var<uniform> params : Params;
+@group(0) @binding(2) var<uniform> params : Params;
 
 const PI: f32 = 3.14159265359;
 
 struct Params {
-  window_type: u32
+  window_type: u32,
+  flip_x: u32
 };
 
 fn hammingWindow(size: vec2f, pos: vec2f) -> f32 {
@@ -44,7 +45,7 @@ fn gaussianWindow(size: vec2f, pos: vec2f) -> f32 {
 
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
-  let coords = gid.xy;
+  var coords = gid.xy;
   let dims = textureDimensions(src);
 
   if (coords.x >= dims.x || coords.y >= dims.y) {
@@ -63,6 +64,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let colour = textureLoad(src, coords, 0);
   let gray = dot(colour.rgb, vec3f(0.299, 0.587, 0.114));
   let value = vec4f(gray * weight, 0.0, 0.0, 0.0);
+
+  if (bool(params.flip_x)) {
+    coords.x = (dims.x - 1u) - coords.x;
+  }
 
   textureStore(dst, coords, value);
 }

@@ -126,6 +126,11 @@ export class FFTWebGPU {
     }
   }
 
+  setFlipX (bool) {
+    const arr = new Uint32Array([ bool ? 1 : 0 ])
+    this.device.queue.writeBuffer(this.buffers.convertUniforms, 4, arr)
+  }
+
   setColourMap (idx) {
     if (isNaN(idx) || idx < 0 || idx > 5) {
       idx = 0
@@ -197,7 +202,7 @@ export class FFTWebGPU {
         usage: GPUBufferUsage.STORAGE
       }),
       convertUniforms: this.device.createBuffer({
-        size: 4,
+        size: 8,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
       }),
       magnitudeUniforms: this.device.createBuffer({

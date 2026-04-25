@@ -15,6 +15,7 @@ const STORE = {
   GENERATOR: 'generator',
   CONVERT: 'convert',
   INPUT_DISPLAY: 'input-display-mode',
+  FLIP_X: 'flip-x',
   COLOUR_MAP: 'colour-map',
   INTENSITY_SCALE: 'intensity-scale'
 }
@@ -29,9 +30,10 @@ const state = {
   deviceId: localStorage.getItem(STORE.CAMERA) ?? null,
   currentPattern: localStorage.getItem(STORE.GENERATOR) ?? Object.keys(Generators)[0],
   convertOption: localStorage.getItem(STORE.CONVERT) ?? "PeriodicPlusSmooth",
+  flipX: (localStorage.getItem(STORE.FLIP_X) ?? "false") === "true",
   inputDisplay: localStorage.getItem(STORE.INPUT_DISPLAY) ?? "raw",
   colourMap: localStorage.getItem(STORE.COLOUR_MAP) ?? "None",
-  intensityScale: localStorage.getItem(STORE.INTENSITY_SCALE) ?? 0.25
+  intensityScale: parseFloat(localStorage.getItem(STORE.INTENSITY_SCALE)) ?? 0.25
 }
 
 const elements = {
@@ -45,6 +47,7 @@ const elements = {
   patternSelect: document.getElementById('patternSelect'),
   videoDevices: document.getElementById('videoDevices'),
   convertOption: document.getElementById('convert'),
+  flipX: document.getElementById('flip-x'),
   inputDisplay: document.getElementById('input-display'),
   colourMap: document.getElementById('colourMap'),
   intensityScale: document.getElementById('scale'),
@@ -81,6 +84,7 @@ async function init () {
     await setupUI()
     await gpu.init(elements.input, elements.output, elements.integ, SIZE)
     gpu.setInputTextureConvertMethod(FFTWebGPU.InputConversionMode[state.convertOption])
+    gpu.setFlipX(state.flipX)
     gpu.setInputTextureDisplayMode(FFTWebGPU.InputDisplayMode[state.inputDisplay])
     gpu.setColourMap(FFTWebGPU.ColourMap[state.colourMap])
     gpu.setMagnitudeScale(state.intensityScale)
@@ -154,6 +158,13 @@ async function setupUI () {
     localStorage.setItem(STORE.CONVERT, state.convertOption)
   })
   elements.convertOption.value = state.convertOption
+
+  elements.flipX.addEventListener('click', e => {
+    state.flipX = e.target.checked
+    gpu.setFlipX(state.flipX)
+    localStorage.setItem(STORE.FLIP_X, state.flipX)
+  })
+  elements.flipX.checked = state.flipX
 
   // Colour map selection
   elements.colourMap.addEventListener('change', e => {
