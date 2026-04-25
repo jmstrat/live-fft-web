@@ -45,6 +45,7 @@ export class FFTWebGPU {
     this.size = size
     // This is just for the integration, we don't include the corners
     this.maxR = (size / 2) - 1
+    this.integrationBins = integrationCanvas.width
     if (!navigator.gpu) {
       const err = new Error('WebGPU not supported')
       err.code = 'WEBGPU_MISSING'
@@ -186,15 +187,15 @@ export class FFTWebGPU {
 
     this.buffers = {
       sum: this.device.createBuffer({
-        size: this.maxR * 4,
+        size: this.integrationBins * 4,
         usage: GPUBufferUsage.STORAGE
       }),
       count: this.device.createBuffer({
-        size: this.maxR * 4,
+        size: this.integrationBins * 4,
         usage: GPUBufferUsage.STORAGE
       }),
       profile: this.device.createBuffer({
-        size: this.maxR * 4,
+        size: this.integrationBins * 4,
         usage: GPUBufferUsage.STORAGE
       }),
       global_max: this.device.createBuffer({
@@ -368,17 +369,36 @@ export class FFTWebGPU {
 
     this.integrationClearPipeline = this.device.createComputePipeline({
       layout: 'auto',
-      compute: { module: this.shaders.integration, entryPoint: 'clear'}
+      compute: {
+        module: this.shaders.integration,
+        entryPoint: 'clear',
+        constants: {
+          NUM_BINS: this.integrationBins
+        }
+      }
     })
 
     this.integrationPipeline = this.device.createComputePipeline({
       layout: 'auto',
-      compute: { module: this.shaders.integration, entryPoint: 'sum'}
+      compute: {
+        module: this.shaders.integration,
+        entryPoint: 'sum',
+        constants: {
+          NUM_BINS: this.integrationBins,
+          MAX_RADIUS: this.maxR
+        }
+      }
     })
 
     this.integrationNormPipeline = this.device.createComputePipeline({
       layout: 'auto',
-      compute: { module: this.shaders.integration, entryPoint: 'norm'}
+      compute: {
+        module: this.shaders.integration,
+        entryPoint: 'norm',
+        constants: {
+          NUM_BINS: this.integrationBins
+        }
+      }
     })
 
     this.integrationClearBindGroup = this.device.createBindGroup({
@@ -386,7 +406,6 @@ export class FFTWebGPU {
       entries: [
         { binding: 1, resource: { buffer: this.buffers.sum } },
         { binding: 2, resource: { buffer: this.buffers.count } },
-        { binding: 3, resource: { buffer: this.buffers.profile } },
         { binding: 4, resource: { buffer: this.buffers.global_max } }
       ]
     })
@@ -396,8 +415,7 @@ export class FFTWebGPU {
       entries: [
         { binding: 0, resource: this.views.fft[1] },
         { binding: 1, resource: { buffer: this.buffers.sum } },
-        { binding: 2, resource: { buffer: this.buffers.count } },
-        { binding: 3, resource: { buffer: this.buffers.profile } }
+        { binding: 2, resource: { buffer: this.buffers.count } }
       ]
     })
 
@@ -454,7 +472,10 @@ export class FFTWebGPU {
     this.plotPipeline = this.device.createRenderPipeline({
       layout: 'auto',
       vertex: {
-        module: this.shaders.plot
+        module: this.shaders.plot,
+        constants: {
+          SIZE: this.integrationBins
+        }
       },
       fragment: {
         module: this.shaders.plot,
@@ -641,7 +662,7 @@ export class FFTWebGPU {
       pass.setPipeline(this.integrationClearPipeline)
       pass.setBindGroup(0, this.integrationClearBindGroup)
       pass.dispatchWorkgroups(
-        Math.ceil(this.maxR / 64)
+        Math.ceil(this.integrationBins / 64)
       )
       pass.end()
     }
@@ -662,7 +683,7 @@ export class FFTWebGPU {
       pass.setPipeline(this.integrationNormPipeline)
       pass.setBindGroup(0, this.integrationNormBindGroup)
       pass.dispatchWorkgroups(
-        Math.ceil(this.maxR / 64)
+        Math.ceil(this.integrationBins / 64)
       )
       pass.end()
     }
@@ -678,7 +699,7 @@ export class FFTWebGPU {
 
       pass.setPipeline(this.plotPipeline)
       pass.setBindGroup(0, this.plotBindGroup)
-      pass.draw(this.maxR)
+      pass.draw(this.integrationBins)
       pass.end()
     }
 
