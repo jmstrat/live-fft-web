@@ -136,24 +136,30 @@ export const Generators = {
     }
   },
   'Big Lattice': (ctx) => {
-    const spacing = ctx.canvas.width * LATTICE_SIZE_F / 8
-    const radius = spacing * LATTICE_R_F
-    const vSpacing = spacing * (Math.sqrt(3) / 2)
+    const marginX = 0
+    const marginY = 0
+
+    const spacing = 16
+    const radius = 2
+    const vSpacing = spacing
 
     ctx.fillStyle = FG
 
-    const xmax = ctx.canvas.width - spacing
-    const ymax = ctx.canvas.height - vSpacing
+    const xMin = marginX
+    const xMax = ctx.canvas.width - marginX
+    const yMin = marginY
+    const yMax = ctx.canvas.height - marginY
 
-    for (let y = spacing, row = 0; y <= ymax; y += vSpacing, row++) {
+    for (let y = yMin, row = 0; y <= yMax; y += vSpacing, row++) {
       const offset = (row % 2) * (spacing / 2)
 
-      for (let x = spacing - offset; x <= xmax; x += spacing) {
+      for (let x = xMin + offset; x <= xMax; x += spacing) {
         ctx.beginPath()
         ctx.arc(x, y, radius, 0, Math.PI * 2)
         ctx.fill()
       }
     }
+
   }
 }
 
