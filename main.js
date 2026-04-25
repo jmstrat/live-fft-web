@@ -13,6 +13,8 @@ const STORE = {
   SOURCE: 'source',
   CAMERA: 'camera',
   GENERATOR: 'generator',
+  CONVERT: 'convert',
+  INPUT_DISPLAY: 'input-display-mode',
   COLOUR_MAP: 'colour-map',
   INTENSITY_SCALE: 'intensity-scale'
 }
@@ -26,6 +28,8 @@ const state = {
   sourceMode: localStorage.getItem(STORE.SOURCE) ?? SOURCES.GENERATOR,
   deviceId: localStorage.getItem(STORE.CAMERA) ?? null,
   currentPattern: localStorage.getItem(STORE.GENERATOR) ?? Object.keys(Generators)[0],
+  convertOption: localStorage.getItem(STORE.CONVERT) ?? 1,
+  inputDisplay: localStorage.getItem(STORE.INPUT_DISPLAY) ?? FFTWebGPU.InputDisplayMode.raw,
   colourMap: localStorage.getItem(STORE.COLOUR_MAP) ?? 0,
   intensityScale: localStorage.getItem(STORE.INTENSITY_SCALE) ?? 0.25,
 }
@@ -40,6 +44,8 @@ const elements = {
   sourceSelect: document.getElementById('sourceSelect'),
   patternSelect: document.getElementById('patternSelect'),
   videoDevices: document.getElementById('videoDevices'),
+  convertOption: document.getElementById('convert'),
+  inputDisplay: document.getElementById('input-display'),
   colourMap: document.getElementById('colourMap'),
   intensityScale: document.getElementById('scale'),
 
@@ -74,6 +80,8 @@ async function init () {
   try {
     await setupUI()
     await gpu.init(elements.input, elements.output, elements.integ, SIZE)
+    gpu.setInputTextureConvertMethod(state.convertOption)
+    gpu.setInputTextureDisplayMode(state.inputDisplay)
     gpu.setColourMap(state.colourMap)
     gpu.setMagnitudeScale(state.intensityScale)
   } catch (err) {
@@ -131,6 +139,22 @@ async function setupUI () {
   elements.sourceSelect.value = state.sourceMode
   await changeSourceMode(state.sourceMode)
 
+  // Input conversion method
+  elements.inputDisplay.addEventListener('change', e => {
+    state.inputDisplay = e.target.value
+    gpu.setInputTextureDisplayMode(state.inputDisplay)
+    localStorage.setItem(STORE.INPUT_DISPLAY, state.inputDisplay)
+  })
+  elements.inputDisplay.value = state.inputDisplay
+
+  // Input display method
+  elements.convertOption.addEventListener('change', e => {
+    state.convertOption = parseInt(e.target.value)
+    gpu.setInputTextureConvertMethod(state.convertOption)
+    localStorage.setItem(STORE.CONVERT, state.convertOption)
+  })
+  elements.convertOption.value = state.convertOption
+
   // Colour map selection
   elements.colourMap.addEventListener('change', e => {
     state.colourMap = parseInt(e.target.value)
@@ -139,6 +163,7 @@ async function setupUI () {
   })
   elements.colourMap.value = state.colourMap
 
+  // Intensity slider
   elements.intensityScale.addEventListener('change', e => {
     const percent = e.target.value
     state.intensityScale = percent / 100

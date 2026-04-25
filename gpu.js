@@ -13,6 +13,13 @@
 const RADIX = 4
 
 export class FFTWebGPU {
+  static InputDisplayMode = {
+    raw: 'raw',
+    processed: 'processed'
+  }
+
+  #inputDisplayMode = 'raw'
+
   async init (inputCanvas, ftCanvas, integrationCanvas, size) {
     this.size = size
     // This is just for the integration, we don't include the corners
@@ -30,12 +37,22 @@ export class FFTWebGPU {
       throw err
     }
 
+    const requiredFeatures = []
+
+    if (this.adapter.features.has("float32-filterable")) {
+      requiredFeatures.push("float32-filterable")
+      this.canRenderFloat32 = true
+    } else {
+      this.canRenderFloat32 = false
+    }
+
     try {
       this.device = await this.adapter.requestDevice({
         requiredLimits: {
           maxComputeWorkgroupSizeX: this.size / RADIX,
           maxComputeInvocationsPerWorkgroup: this.size / RADIX
-        }
+        },
+        requiredFeatures
       })
     } catch (err) {
       const wrapped = new Error('WebGPU limits unsupported', { cause: err })
@@ -57,6 +74,28 @@ export class FFTWebGPU {
     await this.compileShaders()
     this.makeResources()
     this.makePipelines()
+  }
+
+  setInputTextureConvertMethod (idx) {
+    if (isNaN(idx) || idx < 0) {
+      idx = 0
+    }
+
+    const arr = new Uint32Array([idx])
+    this.device.queue.writeBuffer(this.buffers.convertUniforms, 0, arr)
+  }
+
+  setInputTextureDisplayMode (mode) {
+    if (mode === FFTWebGPU.InputDisplayMode.processed) {
+      if (!this.canRenderFloat32) {
+        console.error('Cannot render processed input due to lack of GPU hardware support')
+        this.#inputDisplayMode = FFTWebGPU.InputDisplayMode.raw
+      } else {
+        this.#inputDisplayMode = FFTWebGPU.InputDisplayMode.processed
+      }
+    } else {
+      this.#inputDisplayMode = FFTWebGPU.InputDisplayMode.raw
+    }
   }
 
   setColourMap (idx) {
@@ -121,6 +160,10 @@ export class FFTWebGPU {
         size: 4,
         usage: GPUBufferUsage.STORAGE
       }),
+      convertUniforms: this.device.createBuffer({
+        size: 4,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+      }),
       magnitudeUniforms: this.device.createBuffer({
         size: 8,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
@@ -157,7 +200,8 @@ export class FFTWebGPU {
       layout: this.convertPipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: this.views.input },
-        { binding: 1, resource: this.views.fft[0] }
+        { binding: 1, resource: this.views.fft[0] },
+        { binding: 3, resource: { buffer: this.buffers.convertUniforms } }
       ]
     })
 
@@ -250,49 +294,45 @@ export class FFTWebGPU {
       ]
     })
 
-    this.renderPipeline = this.device.createRenderPipeline({
-      layout: 'auto',
-      vertex: {
-        module: this.shaders.render
-      },
-      fragment: {
-        module: this.shaders.render,
-        targets: [{ format: this.format }]
-      }
-    })
-
     const sampler = this.device.createSampler({
       magFilter: "linear",
       minFilter: "linear"
     })
 
-    this.renderInputBindGroup = this.device.createBindGroup({
-      layout: this.renderPipeline.getBindGroupLayout(0),
-      entries: [
-        {
-          binding: 0,
-          resource: this.views.input
+    const makeRenderPipeline = (constants, view) => {
+      const pipeline = this.device.createRenderPipeline({
+        layout: 'auto',
+        vertex: {
+          module: this.shaders.render
         },
-        {
-          binding: 1,
-          resource: sampler
+        fragment: {
+          module: this.shaders.render,
+          targets: [{ format: this.format }],
+          constants
         }
-      ]
-    })
+      })
 
-    this.renderFFTBindGroup = this.device.createBindGroup({
-      layout: this.renderPipeline.getBindGroupLayout(0),
-      entries: [
-        {
-          binding: 0,
-          resource: this.views.output
-        },
-        {
-          binding: 1,
-          resource: sampler
-        }
-      ]
-    })
+      const bindGroup = this.device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          {
+            binding: 0,
+            resource: view
+          },
+          {
+            binding: 1,
+            resource: sampler
+          }
+        ]
+      })
+      return { pipeline, bindGroup }
+    }
+
+    this.renderPipelines = {
+      [FFTWebGPU.InputDisplayMode.raw]: makeRenderPipeline({ GREYSCALE: false }, this.views.input),
+      [FFTWebGPU.InputDisplayMode.processed]: makeRenderPipeline({ GREYSCALE: true }, this.views.fft[0]),
+      output: makeRenderPipeline({ GREYSCALE: false }, this.views.output),
+    }
 
     this.plotPipeline = this.device.createRenderPipeline({
       layout: 'auto',
@@ -329,6 +369,17 @@ export class FFTWebGPU {
     const encoder = this.device.createCommandEncoder()
 
     {
+      const pass = encoder.beginComputePass()
+      pass.setPipeline(this.convertPipeline)
+      pass.setBindGroup(0, this.convertBindGroup)
+      pass.dispatchWorkgroups(
+        Math.ceil(this.size / 8),
+        Math.ceil(this.size / 8)
+      )
+      pass.end()
+    }
+
+    {
       const pass = encoder.beginRenderPass({
         colorAttachments: [{
           view: this.ctxInput.getCurrentTexture().createView(),
@@ -337,20 +388,11 @@ export class FFTWebGPU {
         }]
       })
 
-      pass.setPipeline(this.renderPipeline)
-      pass.setBindGroup(0, this.renderInputBindGroup)
-      pass.draw(3)
-      pass.end()
-    }
+      const { pipeline, bindGroup } = this.renderPipelines[this.#inputDisplayMode]
 
-    {
-      const pass = encoder.beginComputePass()
-      pass.setPipeline(this.convertPipeline)
-      pass.setBindGroup(0, this.convertBindGroup)
-      pass.dispatchWorkgroups(
-        Math.ceil(this.size / 8),
-        Math.ceil(this.size / 8)
-      )
+      pass.setPipeline(pipeline)
+      pass.setBindGroup(0, bindGroup)
+      pass.draw(3)
       pass.end()
     }
 
@@ -390,8 +432,10 @@ export class FFTWebGPU {
         }]
       })
 
-      pass.setPipeline(this.renderPipeline)
-      pass.setBindGroup(0, this.renderFFTBindGroup)
+      const { pipeline, bindGroup } = this.renderPipelines.output
+
+      pass.setPipeline(pipeline)
+      pass.setBindGroup(0, bindGroup)
       pass.draw(3)
       pass.end()
     }

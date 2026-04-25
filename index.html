@@ -62,6 +62,25 @@
     </section>
 
     <section>
+      <label>Input Processing</label>
+      <select id="convert">
+        <option value="0">Greyscale</option>
+        <option default value="1">Greyscale + Hamming Window</option>
+        <option value="2">Greyscale + Hahn Window</option>
+        <option value="3">Greyscale + Blackman Window</option>
+        <option value="4">Greyscale + Gaussian Window</option>
+      </select>
+    </section>
+
+    <section>
+      <label>Input Display</label>
+      <select id="input-display">
+        <option default value="raw">Raw</option>
+        <option value="processed">Processed</option>
+      </select>
+    </section>
+
+    <section>
       <label>Colour Mapping</label>
       <select id="colourMap">
         <option default value="0">Greyscale</option>
