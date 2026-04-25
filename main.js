@@ -80,9 +80,9 @@ async function init () {
   try {
     await setupUI()
     await gpu.init(elements.input, elements.output, elements.integ, SIZE)
-    gpu.setInputTextureConvertMethod(state.convertOption)
-    gpu.setInputTextureDisplayMode(state.inputDisplay)
-    gpu.setColourMap(state.colourMap)
+    gpu.setInputTextureConvertMethod(FFTWebGPU.InputConversionMode[state.convertOption])
+    gpu.setInputTextureDisplayMode(FFTWebGPU.InputDisplayMode[state.inputDisplay])
+    gpu.setColourMap(FFTWebGPU.ColourMap[state.colourMap])
     gpu.setMagnitudeScale(state.intensityScale)
   } catch (err) {
     showError(err)
@@ -142,23 +142,23 @@ async function setupUI () {
   // Input conversion method
   elements.inputDisplay.addEventListener('change', e => {
     state.inputDisplay = e.target.value
-    gpu.setInputTextureDisplayMode(state.inputDisplay)
+    gpu.setInputTextureDisplayMode(FFTWebGPU.InputDisplayMode[state.inputDisplay])
     localStorage.setItem(STORE.INPUT_DISPLAY, state.inputDisplay)
   })
   elements.inputDisplay.value = state.inputDisplay
 
   // Input display method
   elements.convertOption.addEventListener('change', e => {
-    state.convertOption = parseInt(e.target.value)
-    gpu.setInputTextureConvertMethod(state.convertOption)
+    state.convertOption = e.target.value
+    gpu.setInputTextureConvertMethod(FFTWebGPU.InputConversionMode[state.convertOption])
     localStorage.setItem(STORE.CONVERT, state.convertOption)
   })
   elements.convertOption.value = state.convertOption
 
   // Colour map selection
   elements.colourMap.addEventListener('change', e => {
-    state.colourMap = parseInt(e.target.value)
-    gpu.setColourMap(state.colourMap)
+    state.colourMap = e.target.value
+    gpu.setColourMap(FFTWebGPU.ColourMap[state.colourMap])
     localStorage.setItem(STORE.COLOUR_MAP, state.colourMap)
   })
   elements.colourMap.value = state.colourMap

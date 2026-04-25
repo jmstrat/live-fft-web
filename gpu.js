@@ -13,9 +13,27 @@
 const RADIX = 4
 
 export class FFTWebGPU {
+
   static InputDisplayMode = {
     raw: 'raw',
     processed: 'processed'
+  }
+
+  static InputConversionMode = {
+    None: 0,
+    HammingWindow: 1,
+    HannWindow: 2,
+    BlackmanWindow: 3,
+    GaussianWindow: 4
+  }
+
+  static ColourMap = {
+    None: 0,
+    Viridis: 1,
+    Plasma: 2,
+    Magma: 3,
+    Inferno: 4,
+    Cividis: 5
   }
 
   #inputDisplayMode = 'raw'
