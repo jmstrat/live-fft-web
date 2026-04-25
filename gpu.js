@@ -24,7 +24,9 @@ export class FFTWebGPU {
     HammingWindow: 1,
     HannWindow: 2,
     BlackmanWindow: 3,
-    GaussianWindow: 4
+    GaussianWindow: 4,
+
+    PeriodicPlusSmooth: 99
   }
 
   static ColourMap = {
@@ -37,6 +39,7 @@ export class FFTWebGPU {
   }
 
   #inputDisplayMode = 'raw'
+  #periodicPlusSmooth = false
 
   async init (inputCanvas, ftCanvas, integrationCanvas, size) {
     this.size = size
@@ -99,6 +102,13 @@ export class FFTWebGPU {
       idx = 0
     }
 
+    if (idx === FFTWebGPU.InputConversionMode.PeriodicPlusSmooth) {
+      idx = 0
+      this.#periodicPlusSmooth = true
+    } else {
+      this.#periodicPlusSmooth = false
+    }
+
     const arr = new Uint32Array([idx])
     this.device.queue.writeBuffer(this.buffers.convertUniforms, 0, arr)
   }
@@ -151,13 +161,21 @@ export class FFTWebGPU {
         GPUTextureUsage.RENDER_ATTACHMENT
       ),
       // Complex plane storage (R: Real, G: Imaginary)
-      fft: [ createTexture('rg32float'), createTexture('rg32float') ],
+      fft: [ createTexture(
+        'rg32float',
+        GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC
+      ), createTexture('rg32float') ],
+      greyscaleCopy: createTexture(
+        'rg32float',
+        GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
+      ),
       output: createTexture('rgba8unorm')
     }
 
     this.views = {
       input: this.textures.input.createView(),
       fft: this.textures.fft.map(x => x.createView()),
+      greyscaleCopy: this.textures.greyscaleCopy.createView(),
       output: this.textures.output.createView()
     }
 
@@ -191,6 +209,9 @@ export class FFTWebGPU {
 
   async compileShaders () {
     const convert = await (await fetch('Shaders/convert.wgsl')).text()
+    const boundaryImage = await (await fetch('Shaders/boundary-image.wgsl')).text()
+    const poisson = await (await fetch('Shaders/poisson.wgsl')).text()
+    const decompose = await (await fetch('Shaders/decompose.wgsl')).text()
     const fft = await (await fetch('Shaders/fft-stockham.wgsl')).text()
     const magnitude = await (await fetch('Shaders/magnitude.wgsl')).text()
     const integration = await (await fetch('Shaders/integrate.wgsl')).text()
@@ -199,6 +220,9 @@ export class FFTWebGPU {
 
     this.shaders = {
       convert: this.device.createShaderModule({ code: convert }),
+      boundaryImage: this.device.createShaderModule({ code: boundaryImage }),
+      poisson: this.device.createShaderModule({ code: poisson }),
+      decompose: this.device.createShaderModule({ code: decompose }),
       fft: this.device.createShaderModule({ code: fft }),
       magnitude: this.device.createShaderModule({ code: magnitude }),
       integration: this.device.createShaderModule({ code: integration }),
@@ -219,7 +243,47 @@ export class FFTWebGPU {
       entries: [
         { binding: 0, resource: this.views.input },
         { binding: 1, resource: this.views.fft[0] },
-        { binding: 3, resource: { buffer: this.buffers.convertUniforms } }
+        { binding: 2, resource: { buffer: this.buffers.convertUniforms } }
+      ]
+    })
+
+    this.boundaryImagePipeline = this.device.createComputePipeline({
+      layout: 'auto',
+      compute: { module: this.shaders.boundaryImage }
+    })
+
+    this.boundaryImageBindGroup = this.device.createBindGroup({
+      layout: this.boundaryImagePipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: this.views.greyscaleCopy },
+        { binding: 1, resource: this.views.fft[0] }
+      ]
+    })
+
+    this.poissonPipeline = this.device.createComputePipeline({
+      layout: 'auto',
+      compute: { module: this.shaders.poisson }
+    })
+
+    this.poissonBindGroup = this.device.createBindGroup({
+      layout: this.poissonPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: this.views.fft[0] },
+        { binding: 1, resource: this.views.fft[1] }
+      ]
+    })
+
+    this.decomposePipeline = this.device.createComputePipeline({
+      layout: 'auto',
+      compute: { module: this.shaders.decompose }
+    })
+
+    this.decomposeBindGroup = this.device.createBindGroup({
+      layout: this.decomposePipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: this.views.greyscaleCopy },
+        { binding: 1, resource: this.views.fft[1] },
+        { binding: 2, resource: this.views.fft[0] }
       ]
     })
 
@@ -234,7 +298,20 @@ export class FFTWebGPU {
       }
     })
 
-    this.fftBindGroupH = this.device.createBindGroup({
+    this.invFftPipeline = this.device.createComputePipeline({
+      layout: 'auto',
+      compute: {
+        module: this.shaders.fft,
+        constants: {
+          N: this.size,
+          WORKGROUP_SIZE: this.size / RADIX,
+          INVERSE: true
+        }
+      }
+    })
+
+    this.fftBindGroups = new Array(2)
+    this.fftBindGroups[0] = this.device.createBindGroup({
       layout: this.fftPipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: this.views.fft[0] },
@@ -242,8 +319,25 @@ export class FFTWebGPU {
       ]
     })
 
-    this.fftBindGroupV = this.device.createBindGroup({
+    this.fftBindGroups[1] = this.device.createBindGroup({
       layout: this.fftPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: this.views.fft[1] },
+        { binding: 1, resource: this.views.fft[0] }
+      ]
+    })
+
+    this.invFftBindGroups = new Array(2)
+    this.invFftBindGroups[0] = this.device.createBindGroup({
+      layout: this.invFftPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: this.views.fft[0] },
+        { binding: 1, resource: this.views.fft[1] }
+      ]
+    })
+
+    this.invFftBindGroups[1] = this.device.createBindGroup({
+      layout: this.invFftPipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: this.views.fft[1] },
         { binding: 1, resource: this.views.fft[0] }
@@ -397,6 +491,85 @@ export class FFTWebGPU {
       pass.end()
     }
 
+    if (this.#periodicPlusSmooth) {
+      // Backup the greyscale image (I)
+      encoder.copyTextureToTexture(
+        { texture: this.textures.fft[0] },
+        { texture: this.textures.greyscaleCopy },
+        [this.size, this.size]
+      )
+
+      // Compute Boundary Image from I -> V
+      {
+        const pass = encoder.beginComputePass()
+        pass.setPipeline(this.boundaryImagePipeline)
+        pass.setBindGroup(0, this.boundaryImageBindGroup)
+        pass.dispatchWorkgroups(
+          Math.ceil(this.size / 8),
+          Math.ceil(this.size / 8)
+        )
+        pass.end()
+      }
+
+      // FFT(V) -> V-hat
+      {
+        const pass = encoder.beginComputePass()
+        pass.setPipeline(this.fftPipeline)
+        pass.setBindGroup(0, this.fftBindGroups[0])
+        pass.dispatchWorkgroups(1, this.size)
+        pass.end()
+      }
+
+      {
+        const pass = encoder.beginComputePass()
+        pass.setPipeline(this.fftPipeline)
+        pass.setBindGroup(0, this.fftBindGroups[1])
+        pass.dispatchWorkgroups(1, this.size)
+        pass.end()
+      }
+
+      // Poisson Filter on V-hat -> S-hat
+      {
+        const pass = encoder.beginComputePass()
+        pass.setPipeline(this.poissonPipeline)
+        pass.setBindGroup(0, this.poissonBindGroup)
+        pass.dispatchWorkgroups(
+          Math.ceil(this.size / 8),
+          Math.ceil(this.size / 8)
+        )
+        pass.end()
+      }
+
+      // InvFFT(S-hat) -> s
+      {
+        const pass = encoder.beginComputePass()
+        pass.setPipeline(this.invFftPipeline)
+        pass.setBindGroup(0, this.invFftBindGroups[1])
+        pass.dispatchWorkgroups(1, this.size)
+        pass.end()
+      }
+
+      {
+        const pass = encoder.beginComputePass()
+        pass.setPipeline(this.invFftPipeline)
+        pass.setBindGroup(0, this.invFftBindGroups[0])
+        pass.dispatchWorkgroups(1, this.size)
+        pass.end()
+      }
+
+      // I - s
+      {
+        const pass = encoder.beginComputePass()
+        pass.setPipeline(this.decomposePipeline)
+        pass.setBindGroup(0, this.decomposeBindGroup)
+        pass.dispatchWorkgroups(
+          Math.ceil(this.size / 8),
+          Math.ceil(this.size / 8)
+        )
+        pass.end()
+      }
+    }
+
     {
       const pass = encoder.beginRenderPass({
         colorAttachments: [{
@@ -417,7 +590,7 @@ export class FFTWebGPU {
     {
       const pass = encoder.beginComputePass()
       pass.setPipeline(this.fftPipeline)
-      pass.setBindGroup(0, this.fftBindGroupH)
+      pass.setBindGroup(0, this.fftBindGroups[0])
       pass.dispatchWorkgroups(1, this.size)
       pass.end()
     }
@@ -425,7 +598,7 @@ export class FFTWebGPU {
     {
       const pass = encoder.beginComputePass()
       pass.setPipeline(this.fftPipeline)
-      pass.setBindGroup(0, this.fftBindGroupV)
+      pass.setBindGroup(0, this.fftBindGroups[1])
       pass.dispatchWorkgroups(1, this.size)
       pass.end()
     }

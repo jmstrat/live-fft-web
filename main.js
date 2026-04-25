@@ -28,10 +28,10 @@ const state = {
   sourceMode: localStorage.getItem(STORE.SOURCE) ?? SOURCES.GENERATOR,
   deviceId: localStorage.getItem(STORE.CAMERA) ?? null,
   currentPattern: localStorage.getItem(STORE.GENERATOR) ?? Object.keys(Generators)[0],
-  convertOption: localStorage.getItem(STORE.CONVERT) ?? 1,
-  inputDisplay: localStorage.getItem(STORE.INPUT_DISPLAY) ?? FFTWebGPU.InputDisplayMode.raw,
-  colourMap: localStorage.getItem(STORE.COLOUR_MAP) ?? 0,
-  intensityScale: localStorage.getItem(STORE.INTENSITY_SCALE) ?? 0.25,
+  convertOption: localStorage.getItem(STORE.CONVERT) ?? "PeriodicPlusSmooth",
+  inputDisplay: localStorage.getItem(STORE.INPUT_DISPLAY) ?? "raw",
+  colourMap: localStorage.getItem(STORE.COLOUR_MAP) ?? "None",
+  intensityScale: localStorage.getItem(STORE.INTENSITY_SCALE) ?? 0.25
 }
 
 const elements = {
