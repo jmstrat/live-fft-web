@@ -7,7 +7,7 @@ import { Generators, clearCanvas } from './generators.js'
 // is handled by gpu.js and its associated shaders. The "Example Images" come
 // from generators.js
 
-const SIZE = 1024 // Must be a power of RADIX (default 4)
+const SIZE = 512 // Must be a power of RADIX (default 2)
 
 const STORE = {
   SOURCE: 'source',
@@ -77,7 +77,7 @@ const ctx = generatorCanvas.getContext('2d', { willReadFrequently: true })
 async function init () {
   elements.input.width = elements.input.height = SIZE
   elements.output.width = elements.output.height = SIZE
-  elements.integ.width = SIZE
+  elements.integ.width = SIZE * 2
   elements.integ.height = SIZE / 2
 
   try {

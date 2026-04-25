@@ -10,7 +10,7 @@
 // Shader constants marked "override" are set by javascript and should not be
 // changed
 
-const RADIX = 4
+const RADIX = 2
 
 export class FFTWebGPU {
 

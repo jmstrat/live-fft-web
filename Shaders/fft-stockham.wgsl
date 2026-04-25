@@ -1,7 +1,7 @@
 @group(0) @binding(0) var input_tex : texture_storage_2d<rg32float, read>;
 @group(0) @binding(1) var output_tex : texture_storage_2d<rg32float, write>;
 
-const RADIX: u32 = 4u;
+const RADIX: u32 = 2u;
 const PI: f32 = 3.14159265359;
 
  // N must be a power of RADIX
