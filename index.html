@@ -50,8 +50,10 @@
       <select id="sourceSelect">
         <option default value="generator">Example Images</option>
         <option value="camera">Live Camera</option>
+        <option value="image">User Images</option>
       </select>
     </section>
+
     <section id="cameraSection">
       <label>Camera</label>
       <select id="videoDevices"></select>
@@ -59,6 +61,10 @@
     <section id="generatorSection">
       <label>Pattern</label>
       <select id="patternSelect"></select>
+    </section>
+    <section id="imageSection">
+      <label>Pattern</label>
+      <select id="imageSelect"></select>
     </section>
 
     <section>
@@ -160,6 +166,12 @@
     <div class="card message">
       <h2>Loading</h2>
       <p>Please wait...</p>
+    </div>
+  </div>
+
+  <div id="drop" class="overlay hidden">
+    <div class="card message">
+      <h2>Drop the images</h2>
     </div>
   </div>
 

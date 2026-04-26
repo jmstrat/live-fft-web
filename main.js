@@ -1,5 +1,6 @@
 import { FFTWebGPU } from './gpu.js'
 import { Generators, clearCanvas } from './generators.js'
+import { ImageCache } from './image-cache.js'
 
 // This is a super-simple vanilla JS page. This file handles the settings and
 // fetching the input image (either from a live camera or by running an
@@ -22,13 +23,15 @@ const STORE = {
 
 const SOURCES = {
   CAMERA: 'camera',
-  GENERATOR: 'generator'
+  GENERATOR: 'generator',
+  IMAGE: 'image'
 }
 
 const state = {
   sourceMode: localStorage.getItem(STORE.SOURCE) ?? SOURCES.GENERATOR,
   deviceId: localStorage.getItem(STORE.CAMERA) ?? null,
   currentPattern: localStorage.getItem(STORE.GENERATOR) ?? Object.keys(Generators)[0],
+  currentImage: "",
   convertOption: localStorage.getItem(STORE.CONVERT) ?? "PeriodicPlusSmooth",
   flipX: (localStorage.getItem(STORE.FLIP_X) ?? "false") === "true",
   inputDisplay: localStorage.getItem(STORE.INPUT_DISPLAY) ?? "processed",
@@ -45,6 +48,7 @@ const elements = {
   // Inputs
   sourceSelect: document.getElementById('sourceSelect'),
   patternSelect: document.getElementById('patternSelect'),
+  imageSelect: document.getElementById('imageSelect'),
   videoDevices: document.getElementById('videoDevices'),
   convertOption: document.getElementById('convert'),
   flipX: document.getElementById('flip-x'),
@@ -55,12 +59,14 @@ const elements = {
   // Input sections
   camSection: document.getElementById('cameraSection'),
   genSection: document.getElementById('generatorSection'),
+  imageSection: document.getElementById('imageSection'),
 
   // Buttons
   fullscreenBtn: document.getElementById('fullscreen-btn'),
 
   // Overlays
   loading: document.getElementById('loading'),
+  drop: document.getElementById('drop'),
   errorOverlay: document.getElementById('errorOverlay'),
   errorTitle: document.getElementById('errorTitle'),
   errorMsg: document.getElementById('errorMessage'),
@@ -74,6 +80,8 @@ const gpu = new FFTWebGPU()
 const generatorCanvas = new OffscreenCanvas(SIZE, SIZE)
 const ctx = generatorCanvas.getContext('2d', { willReadFrequently: true })
 
+const imageCache = new ImageCache(SIZE, SIZE)
+
 async function init () {
   elements.input.width = elements.input.height = SIZE
   elements.output.width = elements.output.height = SIZE
@@ -82,6 +90,7 @@ async function init () {
 
   try {
     await setupUI()
+    setupDragAndDrop()
     await gpu.init(elements.input, elements.output, elements.integ, SIZE)
     gpu.setInputTextureConvertMethod(FFTWebGPU.InputConversionMode[state.convertOption])
     gpu.setFlipX(state.flipX)
@@ -131,7 +140,8 @@ async function setupUI () {
     state.sourceMode = mode
     const isCamera = mode === SOURCES.CAMERA
     elements.camSection.classList.toggle('hidden', !isCamera)
-    elements.genSection.classList.toggle('hidden', isCamera)
+    elements.genSection.classList.toggle('hidden', mode !== SOURCES.GENERATOR)
+    elements.imageSection.classList.toggle('hidden', mode !== SOURCES.IMAGE)
     if (isCamera) {
       await startCamera()
     } else {
@@ -197,6 +207,74 @@ async function setupUI () {
   })
 }
 
+function setupDragAndDrop () {
+  window.addEventListener('dragover', e => {
+    e.preventDefault()
+    if (e.dataTransfer.items) {
+      const isImage = Array.from(e.dataTransfer.items).some(item =>
+        item.kind === 'file' && item.type.startsWith('image/')
+      )
+
+      if (isImage) {
+        elements.drop.classList.remove('hidden')
+        e.dataTransfer.dropEffect = 'copy'
+      } else {
+        e.dataTransfer.dropEffect = 'none'
+      }
+    }
+  })
+
+  window.addEventListener('dragleave', e => {
+    elements.drop.classList.add('hidden')
+  })
+
+  window.addEventListener('drop', e => {
+    e.preventDefault()
+    elements.drop.classList.add('hidden')
+  })
+
+  const { imageSelect, sourceSelect } = elements
+
+  function updateImageSelect () {
+    const placeholder = new Option("Drag & Drop to add images to this list", "")
+    placeholder.disabled = true
+    const separator = new Option("\u2500".repeat(10))
+    separator.disabled = true
+
+    const names = imageCache.names
+    const imageOptions = names.map(name => new Option(name, name))
+
+    imageSelect.replaceChildren(placeholder, separator, ...imageOptions)
+
+    if (names.length > 0) {
+      imageSelect.value = names.at(-1)
+      imageSelect.dispatchEvent(new Event('change'))
+    } else {
+      imageSelect.selectedIndex = 0
+    }
+  }
+
+  updateImageSelect()
+
+  window.addEventListener('drop', async (e) => {
+    const files = Array.from(e.dataTransfer.files)
+                  .filter(file => file.type.startsWith('image/'))
+
+    if (files.length === 0) {
+      return
+    }
+
+    await Promise.all(files.map(file => imageCache.add(file)))
+    updateImageSelect()
+    sourceSelect.value = "image"
+    sourceSelect.dispatchEvent(new Event('change'))
+  })
+
+  imageSelect.addEventListener('change', () => {
+    state.currentImage = imageSelect.value
+  })
+}
+
 async function startCamera () {
   const constraints = {
     width: { ideal: SIZE },
@@ -225,7 +303,7 @@ async function startCamera () {
 
       // Only retry if the deviceId was the problem and we haven't already tried the fallback
       if (constraints.deviceId && (isMissing || isOverconstrained)) {
-        console.error(`Camera ${constraints.deviceId} not found`)
+        console.error(`Camera ${state.deviceId} not found`)
         delete constraints.deviceId
         continue
       }
@@ -248,9 +326,13 @@ function stopCamera () {
 
 async function loop () {
   let source
+  let needsClose = false
+
+  requestAnimationFrame(loop)
+
   if (state.sourceMode === SOURCES.CAMERA) {
     if (elements.videoElement.readyState < 2) {
-      return requestAnimationFrame(loop)
+      return
     }
 
     const v = elements.videoElement
@@ -264,15 +346,23 @@ async function loop () {
       resizeHeight: SIZE,
       resizeQuality: 'medium'
     })
-  } else {
+    needsClose = true
+  } else if (state.sourceMode === SOURCES.GENERATOR) {
     clearCanvas(ctx)
     Generators[state.currentPattern](ctx)
     source = generatorCanvas
+  } else if (state.sourceMode === SOURCES.IMAGE) {
+    clearCanvas(ctx)
+    source = imageCache.get(state.currentImage)
+    if (!source) {
+      source = imageCache.black
+    }
   }
 
   gpu.render(source)
-  source?.close?.()
-  requestAnimationFrame(loop)
+  if (needsClose) {
+    source.close()
+  }
 }
 
 function showError (err) {
