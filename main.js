@@ -8,18 +8,8 @@ import { ImageCache } from './image-cache.js'
 // is handled by gpu.js and its associated shaders. The "Example Images" come
 // from generators.js
 
-const SIZE = 512 // Must be a power of RADIX (default 2)
 
-const STORE = {
-  SOURCE: 'source',
-  CAMERA: 'camera',
-  GENERATOR: 'generator',
-  CONVERT: 'convert',
-  INPUT_DISPLAY: 'input-display-mode',
-  FLIP_X: 'flip-x',
-  COLOUR_MAP: 'colour-map',
-  INTENSITY_SCALE: 'intensity-scale'
-}
+const SIZE = 512 // Must be a power of RADIX (default 2)
 
 const SOURCES = {
   CAMERA: 'camera',
@@ -27,34 +17,71 @@ const SOURCES = {
   IMAGE: 'image'
 }
 
-const state = {
-  sourceMode: localStorage.getItem(STORE.SOURCE) ?? SOURCES.GENERATOR,
-  deviceId: localStorage.getItem(STORE.CAMERA) ?? null,
-  currentPattern: localStorage.getItem(STORE.GENERATOR) ?? Object.keys(Generators)[0],
-  currentImage: "",
-  convertOption: localStorage.getItem(STORE.CONVERT) ?? "PeriodicPlusSmooth",
-  flipX: (localStorage.getItem(STORE.FLIP_X) ?? "false") === "true",
-  inputDisplay: localStorage.getItem(STORE.INPUT_DISPLAY) ?? "processed",
-  colourMap: localStorage.getItem(STORE.COLOUR_MAP) ?? "None",
-  intensityScale: parseFloat(localStorage.getItem(STORE.INTENSITY_SCALE)) || 0.25
+const settings = {
+  // Sources
+  sourceMode: {
+    el: document.getElementById('sourceSelect'),
+    storageKey: 'source',
+    default: SOURCES.GENERATOR,
+    onchange: (v) => changeSourceMode(v)
+  },
+  deviceId: {
+    el: document.getElementById('videoDevices'),
+    storageKey: 'camera',
+    default: null
+  },
+  currentPattern: {
+    el: document.getElementById('patternSelect'),
+    storageKey: 'generator',
+    default: Object.keys(Generators)[0]
+  },
+  currentImage: {
+    el: document.getElementById('imageSelect'),
+    default: ""
+  },
+
+  // Input
+  inputDisplay: {
+    el: document.getElementById('input-display'),
+    storageKey: 'input-display-mode',
+    default: 'processed',
+    onchange: (v) => gpu.setInputTextureDisplayMode(FFTWebGPU.InputDisplayMode[v])
+  },
+  convertOption: {
+    el: document.getElementById('convert'),
+    storageKey: 'convert',
+    default: 'PeriodicPlusSmooth',
+    onchange: (v) => gpu.setInputTextureConvertMethod(FFTWebGPU.InputConversionMode[v])
+  },
+  flipX: {
+    el: document.getElementById('flip-x'),
+    storageKey: 'flip-x',
+    default: false,
+    onchange: (v) => gpu.setFlipX(v)
+  },
+
+  // Output
+  colourMap: {
+    el: document.getElementById('colourMap'),
+    storageKey: 'colour-map',
+    default: 'None',
+    onchange: (v) => gpu.setColourMap(FFTWebGPU.ColourMap[v])
+  },
+  intensityScale: {
+    el: document.getElementById('scale'),
+    storageKey: 'intensity-scale',
+    default: 0.25,
+    toUI: (v) => v * 100,
+    fromUI: (v) => v / 100,
+    onchange: (v) => gpu.setMagnitudeScale(v)
+  }
 }
 
 const elements = {
   // Canvases
   input: document.getElementById('inputCanvas'),
   output: document.getElementById('gpuCanvas'),
-  integ: document.getElementById('integrationCanvas'),
-
-  // Inputs
-  sourceSelect: document.getElementById('sourceSelect'),
-  patternSelect: document.getElementById('patternSelect'),
-  imageSelect: document.getElementById('imageSelect'),
-  videoDevices: document.getElementById('videoDevices'),
-  convertOption: document.getElementById('convert'),
-  flipX: document.getElementById('flip-x'),
-  inputDisplay: document.getElementById('input-display'),
-  colourMap: document.getElementById('colourMap'),
-  intensityScale: document.getElementById('scale'),
+  integration: document.getElementById('integrationCanvas'),
 
   // Input sections
   camSection: document.getElementById('cameraSection'),
@@ -76,6 +103,7 @@ const elements = {
   videoElement: document.createElement('video')
 }
 
+
 const gpu = new FFTWebGPU()
 const generatorCanvas = new OffscreenCanvas(SIZE, SIZE)
 const ctx = generatorCanvas.getContext('2d', { willReadFrequently: true })
@@ -85,18 +113,18 @@ const imageCache = new ImageCache(SIZE, SIZE)
 async function init () {
   elements.input.width = elements.input.height = SIZE
   elements.output.width = elements.output.height = SIZE
-  elements.integ.width = SIZE * 2
-  elements.integ.height = SIZE / 2
+  elements.integration.width = SIZE * 2
+  elements.integration.height = SIZE / 2
 
   try {
-    await setupUI()
+    await gpu.init(elements.input, elements.output, elements.integration, SIZE)
+
+    renderPatternOptions()
+    await refreshCameraOptions()
+    refreshImageOptions()
+    initSettings()
     setupDragAndDrop()
-    await gpu.init(elements.input, elements.output, elements.integ, SIZE)
-    gpu.setInputTextureConvertMethod(FFTWebGPU.InputConversionMode[state.convertOption])
-    gpu.setFlipX(state.flipX)
-    gpu.setInputTextureDisplayMode(FFTWebGPU.InputDisplayMode[state.inputDisplay])
-    gpu.setColourMap(FFTWebGPU.ColourMap[state.colourMap])
-    gpu.setMagnitudeScale(state.intensityScale)
+    setupFullscreen()
   } catch (err) {
     showError(err)
     return
@@ -107,104 +135,105 @@ async function init () {
   loop()
 }
 
-async function setupUI () {
-  // Populate Patterns
+function renderPatternOptions () {
   const patternOptions = Object.keys(Generators).map(name => {
     const opt = document.createElement('option')
     opt.value = name
     opt.textContent = name
     return opt
   })
-  elements.patternSelect.replaceChildren(...patternOptions)
-  elements.patternSelect.value = state.currentPattern
-  elements.patternSelect.addEventListener('change', e => {
-    state.currentPattern = e.target.value
-    localStorage.setItem(STORE.GENERATOR, state.currentPattern)
-  })
+  settings.currentPattern.el.replaceChildren(...patternOptions)
+}
 
-
-  // Populate Cameras (note as implemented this will only refresh on page load)
+async function refreshCameraOptions () {
   const devices = await navigator.mediaDevices.enumerateDevices()
   const deviceOptions = devices
     .filter(({ kind }) => kind === 'videoinput')
     .map(({ deviceId, label }) => new Option(label || 'Camera', deviceId))
-  elements.videoDevices.replaceChildren(...deviceOptions)
-  elements.videoDevices.value = state.deviceId
-  elements.videoDevices.addEventListener('change', e => {
-    state.deviceId = e.target.value
-    startCamera()
-  })
+  settings.deviceId.el.replaceChildren(...deviceOptions)
+}
 
-  // Source mode selection
-  async function changeSourceMode (mode) {
-    state.sourceMode = mode
-    const isCamera = mode === SOURCES.CAMERA
-    elements.camSection.classList.toggle('hidden', !isCamera)
-    elements.genSection.classList.toggle('hidden', mode !== SOURCES.GENERATOR)
-    elements.imageSection.classList.toggle('hidden', mode !== SOURCES.IMAGE)
-    if (isCamera) {
-      await startCamera()
-    } else {
-      stopCamera()
-    }
-    localStorage.setItem(STORE.SOURCE, state.sourceMode)
+function refreshImageOptions () {
+  const placeholder = new Option("Drag & Drop to add images to this list", "")
+  placeholder.disabled = true
+  const separator = new Option("\u2500".repeat(10))
+  separator.disabled = true
+
+  const names = imageCache.names
+  const imageOptions = names.map(name => new Option(name, name))
+
+  const imageSelect = settings.currentImage.el
+
+  imageSelect.replaceChildren(placeholder, separator, ...imageOptions)
+
+  if (names.length > 0) {
+    imageSelect.value = names.at(-1)
+    imageSelect.dispatchEvent(new Event('change'))
+  } else {
+    imageSelect.selectedIndex = 0
   }
-  elements.sourceSelect.addEventListener('change', e => changeSourceMode(e.target.value))
-  elements.sourceSelect.value = state.sourceMode
-  await changeSourceMode(state.sourceMode)
+}
 
-  // Input conversion method
-  elements.inputDisplay.addEventListener('change', e => {
-    state.inputDisplay = e.target.value
-    gpu.setInputTextureDisplayMode(FFTWebGPU.InputDisplayMode[state.inputDisplay])
-    localStorage.setItem(STORE.INPUT_DISPLAY, state.inputDisplay)
-  })
-  elements.inputDisplay.value = state.inputDisplay
+async function changeSourceMode (mode) {
+  const isCamera = mode === SOURCES.CAMERA
+  elements.camSection.classList.toggle('hidden', !isCamera)
+  elements.genSection.classList.toggle('hidden', mode !== SOURCES.GENERATOR)
+  elements.imageSection.classList.toggle('hidden', mode !== SOURCES.IMAGE)
+  if (isCamera) {
+    await startCamera()
+  } else {
+    stopCamera()
+  }
+}
 
-  // Input display method
-  elements.convertOption.addEventListener('change', e => {
-    state.convertOption = e.target.value
-    gpu.setInputTextureConvertMethod(FFTWebGPU.InputConversionMode[state.convertOption])
-    localStorage.setItem(STORE.CONVERT, state.convertOption)
-  })
-  elements.convertOption.value = state.convertOption
+function initSettings () {
+  for (const cfg of Object.values(settings)) {
+    const saved = cfg.storageKey ? localStorage.getItem(cfg.storageKey) : null
 
-  elements.flipX.addEventListener('click', e => {
-    state.flipX = e.target.checked
-    gpu.setFlipX(state.flipX)
-    localStorage.setItem(STORE.FLIP_X, state.flipX)
-  })
-  elements.flipX.checked = state.flipX
-
-  // Colour map selection
-  elements.colourMap.addEventListener('change', e => {
-    state.colourMap = e.target.value
-    gpu.setColourMap(FFTWebGPU.ColourMap[state.colourMap])
-    localStorage.setItem(STORE.COLOUR_MAP, state.colourMap)
-  })
-  elements.colourMap.value = state.colourMap
-
-  // Intensity slider
-  elements.intensityScale.addEventListener('change', e => {
-    const percent = e.target.value
-    state.intensityScale = percent / 100
-    gpu.setMagnitudeScale(state.intensityScale)
-    localStorage.setItem(STORE.INTENSITY_SCALE, state.intensityScale)
-  })
-  elements.intensityScale.value = state.intensityScale * 100
-
-  // Fullscreen
-  elements.fullscreenBtn.addEventListener('click', async () => {
-    try {
-      if (!document.fullscreenElement) {
-        await document.body.requestFullscreen()
+    let val = cfg.default
+    if (saved !== null) {
+      if (typeof cfg.default === 'boolean') {
+        val = saved === 'true'
+      } else if (typeof cfg.default === 'number') {
+        val = parseFloat(saved)
       } else {
-        document.exitFullscreen()
+        val = saved
       }
-    } catch (err) {
-      console.error(err)
     }
-  })
+    cfg.value = val
+    if (cfg.onchange) {
+      cfg.onchange(val)
+    }
+
+    cfg.store = (value) => {
+      cfg.value = value
+      if (cfg.storageKey) {
+        localStorage.setItem(cfg.storageKey, value)
+      }
+    }
+
+    if (cfg.el) {
+      const isCheckbox = cfg.el.type === 'checkbox'
+      const uiVal = cfg.toUI ? cfg.toUI(val) : val
+
+      if (isCheckbox) {
+        cfg.el.checked = uiVal
+      } else {
+        cfg.el.value = uiVal
+      }
+
+      cfg.el.addEventListener(isCheckbox ? 'click' : 'change', () => {
+        const raw = isCheckbox ? cfg.el.checked : cfg.el.value
+        const final = cfg.fromUI ? cfg.fromUI(raw) : raw
+
+        cfg.store(final)
+
+        if (cfg.onchange) {
+          cfg.onchange(final)
+        }
+      })
+    }
+  }
 }
 
 function setupDragAndDrop () {
@@ -233,29 +262,6 @@ function setupDragAndDrop () {
     elements.drop.classList.add('hidden')
   })
 
-  const { imageSelect, sourceSelect } = elements
-
-  function updateImageSelect () {
-    const placeholder = new Option("Drag & Drop to add images to this list", "")
-    placeholder.disabled = true
-    const separator = new Option("\u2500".repeat(10))
-    separator.disabled = true
-
-    const names = imageCache.names
-    const imageOptions = names.map(name => new Option(name, name))
-
-    imageSelect.replaceChildren(placeholder, separator, ...imageOptions)
-
-    if (names.length > 0) {
-      imageSelect.value = names.at(-1)
-      imageSelect.dispatchEvent(new Event('change'))
-    } else {
-      imageSelect.selectedIndex = 0
-    }
-  }
-
-  updateImageSelect()
-
   window.addEventListener('drop', async (e) => {
     const files = Array.from(e.dataTransfer.files)
                   .filter(file => file.type.startsWith('image/'))
@@ -265,14 +271,24 @@ function setupDragAndDrop () {
     }
 
     await Promise.all(files.map(file => imageCache.add(file)))
-    updateImageSelect()
-    sourceSelect.value = "image"
-    sourceSelect.dispatchEvent(new Event('change'))
+    refreshImageOptions()
+    settings.sourceMode.el.value = "image"
+    settings.sourceMode.el.dispatchEvent(new Event('change'))
   })
+}
 
-  imageSelect.addEventListener('change', () => {
-    state.currentImage = imageSelect.value
-  })
+function setupFullscreen () {
+  elements.fullscreenBtn.addEventListener('click', async () => {
+  try {
+    if (!document.fullscreenElement) {
+      await document.body.requestFullscreen()
+    } else {
+      document.exitFullscreen()
+    }
+  } catch (err) {
+    console.error(err)
+  }
+})
 }
 
 async function startCamera () {
@@ -281,7 +297,7 @@ async function startCamera () {
     height: { ideal: SIZE },
     aspectRatio: { exact: 1 },
     resizeMode: 'crop-and-scale',
-    ...(state.deviceId && { deviceId: { exact: state.deviceId } })
+    ...(settings.deviceId.value && { deviceId: { exact: settings.deviceId.value } })
   }
   // Need to use an exact rather than ideal deviceId to allow the camera to
   // change from the default, but this would cause an error if the stored
@@ -294,8 +310,7 @@ async function startCamera () {
       elements.videoElement.play()
 
       const activeTrack = stream.getVideoTracks()[0]
-      state.deviceId = activeTrack.getSettings().deviceId
-      localStorage.setItem(STORE.CAMERA, state.deviceId)
+      settings.deviceId.store(activeTrack.getSettings().deviceId)
       return
     } catch (err) {
       const isMissing = ['NotFoundError', 'DevicesNotFoundError'].includes(err.name)
@@ -303,7 +318,7 @@ async function startCamera () {
 
       // Only retry if the deviceId was the problem and we haven't already tried the fallback
       if (constraints.deviceId && (isMissing || isOverconstrained)) {
-        console.error(`Camera ${state.deviceId} not found`)
+        console.error(`Camera ${settings.deviceId.value} not found`)
         delete constraints.deviceId
         continue
       }
@@ -330,7 +345,9 @@ async function loop () {
 
   requestAnimationFrame(loop)
 
-  if (state.sourceMode === SOURCES.CAMERA) {
+  const mode = settings.sourceMode.value
+
+  if (mode === SOURCES.CAMERA) {
     if (elements.videoElement.readyState < 2) {
       return
     }
@@ -344,16 +361,17 @@ async function loop () {
     source = await createImageBitmap(v, sx, sy, inputSquareSize, inputSquareSize, {
       resizeWidth: SIZE,
       resizeHeight: SIZE,
-      resizeQuality: 'medium'
+      resizeQuality: 'medium',
+      premultiplyAlpha: 'none'
     })
     needsClose = true
-  } else if (state.sourceMode === SOURCES.GENERATOR) {
+  } else if (mode === SOURCES.GENERATOR) {
     clearCanvas(ctx)
-    Generators[state.currentPattern](ctx)
+    Generators[settings.currentPattern.value](ctx)
     source = generatorCanvas
-  } else if (state.sourceMode === SOURCES.IMAGE) {
+  } else if (mode === SOURCES.IMAGE) {
     clearCanvas(ctx)
-    source = imageCache.get(state.currentImage)
+    source = imageCache.get(settings.currentImage.value)
     if (!source) {
       source = imageCache.black
     }
