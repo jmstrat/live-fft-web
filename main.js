@@ -320,3 +320,18 @@ function _showError (title, message, code = "") {
 }
 
 init()
+
+// Workaround for Safari bug:
+// In a popover positioned with position-anchor, the OS native picker window
+// is not positioned correctly unless the input is focused before the click
+// event fires.
+// This workaround forces the element to be focused before it receives the
+// mousedown event, which seems to fix the bug.
+// Chrome / Firefox work fine with or without this workaround, so enabling it
+// everywhere for consistency.
+document.addEventListener('mousedown', (e) => {
+  if (e.target.tagName === 'SELECT') {
+    e.target.focus()
+    void e.target.offsetWidth
+  }
+}, { capture: true })
