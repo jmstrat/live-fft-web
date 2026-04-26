@@ -1,6 +1,8 @@
 import { FFTWebGPU } from './gpu.js'
+import { Camera } from './camera.js'
 import { Generators, clearCanvas } from './generators.js'
 import { ImageCache } from './image-cache.js'
+import { RenderLoop } from './render-loop.js'
 
 // This is a super-simple vanilla JS page. This file handles the settings and
 // fetching the input image (either from a live camera or by running an
@@ -23,12 +25,43 @@ const settings = {
     el: document.getElementById('sourceSelect'),
     storageKey: 'source',
     default: SOURCES.GENERATOR,
-    onchange: (v) => changeSourceMode(v)
+    onchange: async (mode) => {
+      await loop.stop()
+      const isCamera = mode === SOURCES.CAMERA
+      elements.camSection.classList.toggle('hidden', !isCamera)
+      elements.genSection.classList.toggle('hidden', mode !== SOURCES.GENERATOR)
+      elements.imageSection.classList.toggle('hidden', mode !== SOURCES.IMAGE)
+      if (isCamera) {
+        try {
+          const deviceID = await camera.start(settings.deviceId.value)
+          settings.deviceId.store(deviceID)
+        } catch (err) {
+          showError(err)
+        }
+      } else {
+        camera.stop()
+      }
+      loop.start()
+    }
   },
   deviceId: {
     el: document.getElementById('videoDevices'),
     storageKey: 'camera',
-    default: null
+    default: null,
+    onchange: async (v) => {
+      if (settings.sourceMode.value !== SOURCES.CAMERA) {
+        return
+      }
+
+      await loop.stop()
+      try {
+        const deviceID = await camera.start(v)
+        settings.deviceId.store(deviceID)
+      } catch (err) {
+        showError(err)
+      }
+      loop.start()
+    }
   },
   currentPattern: {
     el: document.getElementById('patternSelect'),
@@ -97,18 +130,44 @@ const elements = {
   errorOverlay: document.getElementById('errorOverlay'),
   errorTitle: document.getElementById('errorTitle'),
   errorMsg: document.getElementById('errorMessage'),
-  errorCode: document.getElementById('errorCode'),
-
-  // Offscreen
-  videoElement: document.createElement('video')
+  errorCode: document.getElementById('errorCode')
 }
-
 
 const gpu = new FFTWebGPU()
 const generatorCanvas = new OffscreenCanvas(SIZE, SIZE)
 const ctx = generatorCanvas.getContext('2d', { willReadFrequently: true })
 
+const camera = new Camera(SIZE)
 const imageCache = new ImageCache(SIZE, SIZE)
+
+let isReady = false
+
+const loop = new RenderLoop(
+  render,
+  // Schedule a new frame
+  (cb) => {
+    if (!isReady) {
+      return false
+    }
+    if (settings.sourceMode.value === SOURCES.CAMERA) {
+      return camera.requestFrame(cb)
+    } else {
+      return requestAnimationFrame(cb)
+    }
+  },
+  // Cancel the scheduled frame
+  (handle) => {
+    if (!handle) {
+      return
+    }
+
+    if (settings.sourceMode.value === SOURCES.CAMERA) {
+      camera.cancelFrame(handle)
+    } else {
+      cancelAnimationFrame(handle)
+    }
+  }
+)
 
 async function init () {
   elements.input.width = elements.input.height = SIZE
@@ -122,17 +181,18 @@ async function init () {
     renderPatternOptions()
     await refreshCameraOptions()
     refreshImageOptions()
-    initSettings()
+    await initSettings()
     setupDragAndDrop()
     setupFullscreen()
+    isReady = true
+    await loop.stop()
+    loop.start()
   } catch (err) {
     showError(err)
     return
   } finally {
     loading.classList.add('hidden')
   }
-
-  loop()
 }
 
 function renderPatternOptions () {
@@ -146,9 +206,8 @@ function renderPatternOptions () {
 }
 
 async function refreshCameraOptions () {
-  const devices = await navigator.mediaDevices.enumerateDevices()
+  const devices = await camera.getDevices()
   const deviceOptions = devices
-    .filter(({ kind }) => kind === 'videoinput')
     .map(({ deviceId, label }) => new Option(label || 'Camera', deviceId))
   settings.deviceId.el.replaceChildren(...deviceOptions)
 }
@@ -174,19 +233,7 @@ function refreshImageOptions () {
   }
 }
 
-async function changeSourceMode (mode) {
-  const isCamera = mode === SOURCES.CAMERA
-  elements.camSection.classList.toggle('hidden', !isCamera)
-  elements.genSection.classList.toggle('hidden', mode !== SOURCES.GENERATOR)
-  elements.imageSection.classList.toggle('hidden', mode !== SOURCES.IMAGE)
-  if (isCamera) {
-    await startCamera()
-  } else {
-    stopCamera()
-  }
-}
-
-function initSettings () {
+async function initSettings () {
   for (const cfg of Object.values(settings)) {
     const saved = cfg.storageKey ? localStorage.getItem(cfg.storageKey) : null
 
@@ -200,10 +247,6 @@ function initSettings () {
         val = saved
       }
     }
-    cfg.value = val
-    if (cfg.onchange) {
-      cfg.onchange(val)
-    }
 
     cfg.store = (value) => {
       cfg.value = value
@@ -211,6 +254,8 @@ function initSettings () {
         localStorage.setItem(cfg.storageKey, value)
       }
     }
+
+    cfg.value = val
 
     if (cfg.el) {
       const isCheckbox = cfg.el.type === 'checkbox'
@@ -232,6 +277,12 @@ function initSettings () {
           cfg.onchange(final)
         }
       })
+    }
+  }
+
+  for (const cfg of Object.values(settings)) {
+    if (cfg.onchange) {
+      await cfg.onchange(cfg.value)
     }
   }
 }
@@ -291,79 +342,17 @@ function setupFullscreen () {
 })
 }
 
-async function startCamera () {
-  const constraints = {
-    width: { ideal: SIZE },
-    height: { ideal: SIZE },
-    aspectRatio: { exact: 1 },
-    resizeMode: 'crop-and-scale',
-    ...(settings.deviceId.value && { deviceId: { exact: settings.deviceId.value } })
-  }
-  // Need to use an exact rather than ideal deviceId to allow the camera to
-  // change from the default, but this would cause an error if the stored
-  // id no-longer exists, so we retry with no device id on failure
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: constraints })
-
-      elements.videoElement.srcObject = stream
-      elements.videoElement.play()
-
-      const activeTrack = stream.getVideoTracks()[0]
-      settings.deviceId.store(activeTrack.getSettings().deviceId)
-      return
-    } catch (err) {
-      const isMissing = ['NotFoundError', 'DevicesNotFoundError'].includes(err.name)
-      const isOverconstrained = err.name === 'OverconstrainedError' && err.constraint === 'deviceId'
-
-      // Only retry if the deviceId was the problem and we haven't already tried the fallback
-      if (constraints.deviceId && (isMissing || isOverconstrained)) {
-        console.error(`Camera ${settings.deviceId.value} not found`)
-        delete constraints.deviceId
-        continue
-      }
-
-      showError(err)
-      return
-    }
-  }
-}
-
-function stopCamera () {
-  const stream = elements.videoElement?.srcObject
-  if (stream) {
-    const tracks = stream.getTracks()
-    tracks.forEach(track => track.stop())
-    elements.videoElement.srcObject = null
-    elements.videoElement.load()
-  }
-}
-
-async function loop () {
+async function render () {
   let source
   let needsClose = false
-
-  requestAnimationFrame(loop)
 
   const mode = settings.sourceMode.value
 
   if (mode === SOURCES.CAMERA) {
-    if (elements.videoElement.readyState < 2) {
+    source = await camera.getImageBitmap()
+    if (!source) {
       return
     }
-
-    const v = elements.videoElement
-    const vWidth = v.videoWidth
-    const vHeight = v.videoHeight
-    const inputSquareSize = Math.min(vWidth, vHeight)
-    const sx = (vWidth - inputSquareSize) / 2
-    const sy = (vHeight - inputSquareSize) / 2
-    source = await createImageBitmap(v, sx, sy, inputSquareSize, inputSquareSize, {
-      resizeWidth: SIZE,
-      resizeHeight: SIZE,
-      resizeQuality: 'medium',
-      premultiplyAlpha: 'none'
-    })
     needsClose = true
   } else if (mode === SOURCES.GENERATOR) {
     clearCanvas(ctx)
