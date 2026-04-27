@@ -1,5 +1,6 @@
 @group(0) @binding(0) var tex: texture_2d<f32>;
-@group(0) @binding(1) var samp: sampler;
+@group(0) @binding(1) var tex_external: texture_external;
+@group(0) @binding(2) var samp: sampler;
 
 override GREYSCALE: bool = false;
 
@@ -15,11 +16,21 @@ fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
   return VertexOutput(pos, vec2f(uv.x, 1.0 - uv.y));
 }
 
+fn processColour(col: vec4f) -> vec4f {
+  if (GREYSCALE) {
+    return vec4f(vec3f(col.r), 1.0);
+  }
+  return col;
+}
+
 @fragment
 fn fs(in: VertexOutput) -> @location(0) vec4f {
   let col = textureSample(tex, samp, in.uv);
-  if (GREYSCALE) {
-    return vec4f(col.r, col.r, col.r, 1.0);
-  }
-  return col;
+  return processColour(col);
+}
+
+@fragment
+fn fs_external(in: VertexOutput) -> @location(0) vec4f {
+  let col = textureSampleBaseClampToEdge(tex_external, samp, in.uv);
+  return processColour(col);
 }

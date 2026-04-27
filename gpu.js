@@ -264,10 +264,10 @@ export class FFTWebGPU {
       ]
     })
 
-    const ConvertExternalBingGroupLayout = this.convertExternalPipeline.getBindGroupLayout(0)
-    this.makeConvertExternalBingGroup = (externalTexture) => {
+    const ConvertExternalBindGroupLayout = this.convertExternalPipeline.getBindGroupLayout(0)
+    this.makeConvertExternalBindGroup = (externalTexture) => {
       return this.device.createBindGroup({
-        layout: ConvertExternalBingGroupLayout,
+        layout: ConvertExternalBindGroupLayout,
         entries: [
           { binding: 1, resource: externalTexture },
           { binding: 2, resource: this.views.fft[0] },
@@ -466,6 +466,7 @@ export class FFTWebGPU {
         fragment: {
           module: this.shaders.render,
           targets: [{ format: this.format }],
+          entryPoint: 'fs',
           constants
         }
       })
@@ -473,14 +474,8 @@ export class FFTWebGPU {
       const bindGroup = this.device.createBindGroup({
         layout: pipeline.getBindGroupLayout(0),
         entries: [
-          {
-            binding: 0,
-            resource: view
-          },
-          {
-            binding: 1,
-            resource: sampler
-          }
+          { binding: 0, resource: view },
+          { binding: 2, resource: sampler }
         ]
       })
       return { pipeline, bindGroup }
@@ -490,6 +485,31 @@ export class FFTWebGPU {
       [FFTWebGPU.InputDisplayMode.raw]: makeRenderPipeline({ GREYSCALE: false }, this.views.input),
       [FFTWebGPU.InputDisplayMode.processed]: makeRenderPipeline({ GREYSCALE: true }, this.views.fft[0]),
       output: makeRenderPipeline({ GREYSCALE: false }, this.views.output),
+    }
+
+    this.renderExternalPipeline = this.device.createRenderPipeline({
+      layout: 'auto',
+      vertex: {
+        module: this.shaders.render
+      },
+      fragment: {
+        module: this.shaders.render,
+        targets: [{ format: this.format }],
+        entryPoint: 'fs_external',
+        constants: { GREYSCALE: false }
+      }
+    })
+
+    const RenderExternalBindGroupLayout = this.renderExternalPipeline.getBindGroupLayout(0)
+
+    this.makeRenderExternalBindGroup = (externalTexture) => {
+      return this.device.createBindGroup({
+        layout: RenderExternalBindGroupLayout,
+        entries: [
+          { binding: 1, resource: externalTexture },
+          { binding: 2, resource: sampler }
+        ]
+      })
     }
 
     this.plotPipeline = this.device.createRenderPipeline({
@@ -524,7 +544,7 @@ export class FFTWebGPU {
       {
         const pass = encoder.beginComputePass()
         pass.setPipeline(this.convertExternalPipeline)
-        pass.setBindGroup(0, this.makeConvertExternalBingGroup(source))
+        pass.setBindGroup(0, this.makeConvertExternalBindGroup(source))
         pass.dispatchWorkgroups(
           Math.ceil(this.size / 8),
           Math.ceil(this.size / 8)
@@ -638,10 +658,18 @@ export class FFTWebGPU {
         }]
       })
 
-      const { pipeline, bindGroup } = this.renderPipelines[this.#inputDisplayMode]
+      if (
+        this.#inputDisplayMode === FFTWebGPU.InputDisplayMode.raw &&
+        source instanceof GPUExternalTexture
+      ) {
+        pass.setPipeline(this.renderExternalPipeline)
+        pass.setBindGroup(0, this.makeRenderExternalBindGroup(source))
+      } else {
+        const { pipeline, bindGroup } = this.renderPipelines[this.#inputDisplayMode]
+        pass.setPipeline(pipeline)
+        pass.setBindGroup(0, bindGroup)
+      }
 
-      pass.setPipeline(pipeline)
-      pass.setBindGroup(0, bindGroup)
       pass.draw(3)
       pass.end()
     }
