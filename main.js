@@ -29,6 +29,16 @@ function getActiveGenerator () {
   return Generators[settings.currentPattern.value]
 }
 
+function markDirty () {
+  const mode = settings.sourceMode.value
+
+  if (mode === SOURCES.GENERATOR) {
+    getActiveGenerator().markDirty()
+  } else if (mode === SOURCES.IMAGE) {
+    lastDrawnImage = null
+  }
+}
+
 const settings = {
   // Sources
   sourceMode: {
@@ -54,14 +64,7 @@ const settings = {
         camera.stop()
       }
 
-      if (mode === SOURCES.GENERATOR) {
-        getActiveGenerator().markDirty()
-      }
-
-      if (mode === SOURCES.IMAGE) {
-        lastDrawnImage = null
-      }
-
+      markDirty()
       loop.start()
     }
   },
@@ -89,7 +92,7 @@ const settings = {
     storageKey: 'generator',
     default: Object.keys(Generators)[0],
     onchange: () => {
-      getActiveGenerator().markDirty()
+      markDirty()
     }
   },
   currentImage: {
@@ -102,19 +105,28 @@ const settings = {
     el: document.getElementById('input-display'),
     storageKey: 'input-display-mode',
     default: 'processed',
-    onchange: (v) => gpu.setInputTextureDisplayMode(FFTWebGPU.InputDisplayMode[v])
+    onchange: (v) => {
+      gpu.setInputTextureDisplayMode(FFTWebGPU.InputDisplayMode[v])
+      markDirty()
+    }
   },
   convertOption: {
     el: document.getElementById('convert'),
     storageKey: 'convert',
     default: 'PeriodicPlusSmooth',
-    onchange: (v) => gpu.setInputTextureConvertMethod(FFTWebGPU.InputConversionMode[v])
+    onchange: (v) => {
+      gpu.setInputTextureConvertMethod(FFTWebGPU.InputConversionMode[v])
+      markDirty()
+    }
   },
   flipX: {
     el: document.getElementById('flip-x'),
     storageKey: 'flip-x',
     default: false,
-    onchange: (v) => gpu.setFlipX(v)
+    onchange: (v) => {
+      gpu.setFlipX(v)
+      markDirty()
+    }
   },
 
   // Output
@@ -122,7 +134,10 @@ const settings = {
     el: document.getElementById('colourMap'),
     storageKey: 'colour-map',
     default: 'None',
-    onchange: (v) => gpu.setColourMap(FFTWebGPU.ColourMap[v])
+    onchange: (v) => {
+      gpu.setColourMap(FFTWebGPU.ColourMap[v])
+      markDirty()
+    }
   },
   intensityScale: {
     el: document.getElementById('scale'),
@@ -130,7 +145,10 @@ const settings = {
     default: 0.25,
     toUI: (v) => v * 100,
     fromUI: (v) => v / 100,
-    onchange: (v) => gpu.setMagnitudeScale(v)
+    onchange: (v) => {
+      gpu.setMagnitudeScale(v)
+      markDirty()
+    }
   }
 }
 
@@ -251,6 +269,7 @@ function renderPatternOptions () {
     return opt
   })
   settings.currentPattern.el.replaceChildren(...patternOptions)
+  settings.currentPattern.refreshElValue()
 }
 
 async function refreshCameraOptions () {
