@@ -13,18 +13,31 @@
 <body>
   <main class="dashboard">
     <div class="row">
-      <canvas id="inputCanvas" class="square output" title="Input image to be Fourier transformed"></canvas>
-      <canvas id="gpuCanvas" class="square output" title="Fourier transformed image"></canvas>
+      <canvas id="inputCanvas" class="square output"
+        title="Input image to be Fourier transformed"
+        aria-label="Input image to be Fourier transformed" role="img">
+        <p>Live visualization of the input signal before Fourier transformation.</p>
+      </canvas>
+      <canvas id="gpuCanvas" class="square output"
+        title="Fourier transformed image"
+        aria-label="Fourier transformed image" role="img">
+          <p>Live visualization of the input signal after Fourier transformation.</p>
+      </canvas>
     </div>
     <div class="row">
-      <canvas id="integrationCanvas" class="output fw" title="Radial integration of the Fourier transformed image"></canvas>
+      <canvas id="integrationCanvas" class="output fw"
+        title="Radial integration of the Fourier transformed image"
+        aria-label="Radial integration of the Fourier transformed image" role="img">
+          <p>Live radial integration of the Fourier transformed signal.</p>
+      </canvas>
     </div>
   </main>
 
   <div class="buttons-container">
     <button id="settingsBtn" class="btn" popovertarget="settingsMenu" aria-label="Settings" title="Settings">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        aria-hidden="true">
         <line x1="3" y1="12" x2="21" y2="12"></line>
         <line x1="3" y1="6" x2="21" y2="6"></line>
         <line x1="3" y1="18" x2="21" y2="18"></line>
@@ -32,23 +45,24 @@
     </button>
 
     <button id="helpBtn" class="btn" popovertarget="helpPopover" aria-label="Help" title="Help">
-      ?
+      <span aria-hidden="true">?</span>
     </button>
 
     <button id="fullscreen-btn" class="btn" aria-label="Fullscreen" title="Fullscreen">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        aria-hidden="true">
         <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
       </svg>
     </button>
   </div>
 
-  <div id="settingsMenu" class="popup" popover title="Settings Menu">
-    <h3>Configuration</h3>
+  <div id="settingsMenu" class="popup" popover role="dialog" aria-labelledby="settingsTitle">
+    <h3 id="settingsTitle">Configuration</h3>
     <section>
       <label for="sourceSelect">Source Mode</label>
       <select id="sourceSelect">
-        <option default value="generator">Example Images</option>
+        <option selected value="generator">Example Images</option>
         <option value="camera">Live Camera</option>
         <option value="image">User Images</option>
       </select>
@@ -78,9 +92,9 @@
         <option value="None">Greyscale</option>
         <option value="HammingWindow">Greyscale + Hamming Window</option>
         <option value="HannWindow">Greyscale + Hahn Window</option>
-        <option value="HannWindow">Greyscale + Blackman Window</option>
+        <option value="BlackmanWindow">Greyscale + Blackman Window</option>
         <option value="GaussianWindow">Greyscale + Gaussian Window</option>
-        <option default value="PeriodicPlusSmooth">Periodic Plus Smooth Image Decomposition</option>
+        <option selected value="PeriodicPlusSmooth">Periodic Plus Smooth Image Decomposition</option>
       </select>
     </section>
 
@@ -88,14 +102,14 @@
       <label for="input-display">Input Display</label>
       <select id="input-display">
         <option value="raw">Raw</option>
-        <option default value="processed">Processed</option>
+        <option selected value="processed">Processed</option>
       </select>
     </section>
 
     <section>
       <label for="colourMap">Colour Mapping</label>
       <select id="colourMap">
-        <option default value="None">Greyscale</option>
+        <option selected value="None">Greyscale</option>
         <option value="Viridis">Viridis</option>
         <option value="Plasma">Plasma</option>
         <option value="Magma">Magma</option>
@@ -110,29 +124,27 @@
     </section>
   </div>
 
-  <div id="helpPopover" class="popup" popover title="Help">
-    <h3>Help</h3>
+  <div id="helpPopover" class="popup" popover role="dialog" aria-labelledby="helpTitle">
+    <h3 id="helpTitle">Help</h3>
     <section>
       <h4>What am I looking at?</h4>
-      <p>
-        The screen is split into three sections:
-        <ul>
-          <li>
-            On the left is the input image, you can choose in the settings menu
-            whether this is a Live capture from your webcam, or one of the sample
-            images included with this program.
-          </li>
-          <li>
-            On the right is the live Fourier transformed version of that image. It
-            displays the magnitude of the fourier transform with a logarithmic
-            scaling.
-          </li>
-          <li>
-            Below is the radial integration of the Fourier transformed image. The
-            x-axis shows distance from the centre, and the y-axis is the intensity.
-          </li>
-        </ul>
-      </p>
+      <p>The screen is split into three sections:</p>
+      <ul>
+        <li>
+          On the left is the input image, you can choose in the settings menu
+          whether this is a Live capture from your webcam, or one of the sample
+          images included with this program.
+        </li>
+        <li>
+          On the right is the live Fourier transformed version of that image. It
+          displays the magnitude of the fourier transform with a logarithmic
+          scaling.
+        </li>
+        <li>
+          Below is the radial integration of the Fourier transformed image. The
+          x-axis shows distance from the centre, and the y-axis is the intensity.
+        </li>
+      </ul>
     </section>
 
     <section>
@@ -154,7 +166,7 @@
     </section>
   </div>
 
-  <div id="errorOverlay" class="overlay hidden">
+  <div id="errorOverlay" class="overlay hidden" aria-live="assertive" role="alert">
     <div class="card error">
       <h2 id="errorTitle">Error</h2>
       <p id="errorMessage">An unexpected error occurred.</p>
@@ -162,7 +174,7 @@
     </div>
   </div>
 
-  <div id="loading" class="overlay">
+  <div id="loading" class="overlay" aria-live="polite" role="status">
     <div class="card message">
       <h2>Loading</h2>
       <p>Please wait...</p>
