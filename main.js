@@ -402,16 +402,16 @@ function setupDragAndDrop () {
 
 function setupFullscreen () {
   elements.fullscreenBtn.addEventListener('click', async () => {
-  try {
-    if (!document.fullscreenElement) {
-      await document.body.requestFullscreen()
-    } else {
-      document.exitFullscreen()
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen()
+      } else {
+        document.exitFullscreen()
+      }
+    } catch (err) {
+      console.error(err)
     }
-  } catch (err) {
-    console.error(err)
-  }
-})
+  })
 }
 
 function showError (err) {

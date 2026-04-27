@@ -12,6 +12,11 @@ body {
   color: var(--text-color);
   font-family: sans-serif;
   height: 100vh;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .dashboard {
@@ -19,9 +24,9 @@ body {
   grid-template-rows: 1fr 0.5fr;
   grid-template-columns: 1fr 1fr;
   gap: var(--margin);
-  height: 95vh;
-  width: 100vw;
+  width: fit-content;
   max-width: 1200px;
+  max-height: 95vh;
   margin: 0 auto;
   padding: 2em;
   box-sizing: border-box;
@@ -31,15 +36,26 @@ body {
   display: grid;
   grid-column: span 2;
   grid-template-columns: subgrid;
-  gap: var(--margin);
   min-height: 0;
   align-items: center;
   justify-items: center;
 }
 
+.row:first-child :first-child {
+  justify-self: start;
+}
+
+.row:first-child :last-child {
+  justify-self: end;
+}
+
+.row .fw {
+  grid-column: span 2;
+  justify-self: stretch;
+}
+
 .square {
   aspect-ratio: 1 / 1;
-  justify-self: center;
 }
 
 .output {
@@ -51,11 +67,6 @@ body {
   border: 4px solid #333;
   border-radius: 12px;
   box-sizing: border-box;
-}
-
-.fw {
-  grid-column: span 2;
-  width: 100%;
 }
 
 .buttons-container {
