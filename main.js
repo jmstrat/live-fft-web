@@ -45,6 +45,8 @@ const settings = {
         try {
           const deviceID = await camera.start(settings.deviceId.value)
           settings.deviceId.store(deviceID)
+
+          await refreshCameraOptions()
         } catch (err) {
           showError(err)
         }
@@ -223,11 +225,11 @@ async function init () {
 
   try {
     await gpu.init(elements.input, elements.output, elements.integration, SIZE)
+    await initSettings()
 
     renderPatternOptions()
     await refreshCameraOptions()
     refreshImageOptions()
-    await initSettings()
     setupDragAndDrop()
     setupFullscreen()
     isReady = true
@@ -256,6 +258,7 @@ async function refreshCameraOptions () {
   const deviceOptions = devices
     .map(({ deviceId, label }) => new Option(label || 'Camera', deviceId))
   settings.deviceId.el.replaceChildren(...deviceOptions)
+  settings.deviceId.refreshElValue()
 }
 
 function refreshImageOptions () {
@@ -305,14 +308,18 @@ async function initSettings () {
 
     if (cfg.el) {
       const isCheckbox = cfg.el.type === 'checkbox'
-      const uiVal = cfg.toUI ? cfg.toUI(val) : val
+      cfg.refreshElValue = () => {
+        const uiVal = cfg.toUI ? cfg.toUI(cfg.value) : cfg.value
 
-      if (isCheckbox) {
-        cfg.el.checked = uiVal
-      } else {
-        cfg.el.value = uiVal
+        if (isCheckbox) {
+          cfg.el.checked = uiVal
+        } else {
+          cfg.el.value = uiVal
+        }
       }
 
+
+      cfg.refreshElValue()
       cfg.el.addEventListener(isCheckbox ? 'click' : 'change', () => {
         const raw = isCheckbox ? cfg.el.checked : cfg.el.value
         const final = cfg.fromUI ? cfg.fromUI(raw) : raw
