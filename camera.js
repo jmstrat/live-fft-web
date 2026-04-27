@@ -82,6 +82,16 @@ export class Camera {
     })
   }
 
+  getExternalTexture (device) {
+    if (!this.isReady) {
+      return null
+    }
+
+    return device.importExternalTexture({
+      source: this.video
+    })
+  }
+
   requestFrame (callback) {
     if ('requestVideoFrameCallback' in this.video) {
       this.callbackHandle = this.video.requestVideoFrameCallback((now, metadata) => {

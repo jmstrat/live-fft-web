@@ -184,16 +184,15 @@ const loop = new RenderLoop(
 
 async function render () {
   let source
-  let needsClose = false
-
   const mode = settings.sourceMode.value
 
   if (mode === SOURCES.CAMERA) {
-    source = await camera.getImageBitmap()
+    source = camera.getExternalTexture(gpu.device)
+
     if (!source) {
       return
     }
-    needsClose = true
+
   } else if (mode === SOURCES.GENERATOR) {
     const generator = getActiveGenerator()
     if (!generator.isDirty()) {
@@ -214,9 +213,6 @@ async function render () {
   }
 
   gpu.render(source)
-  if (needsClose) {
-    source.close()
-  }
 }
 
 async function init () {

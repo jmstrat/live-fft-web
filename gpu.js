@@ -241,17 +241,40 @@ export class FFTWebGPU {
   makePipelines () {
     this.convertPipeline = this.device.createComputePipeline({
       layout: 'auto',
-      compute: { module: this.shaders.convert }
+      compute: {
+        module: this.shaders.convert,
+        entryPoint: 'main'
+      }
+    })
+
+    this.convertExternalPipeline = this.device.createComputePipeline({
+      layout: 'auto',
+      compute: {
+        module: this.shaders.convert,
+        entryPoint: 'main_external'
+      }
     })
 
     this.convertBindGroup = this.device.createBindGroup({
       layout: this.convertPipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: this.views.input },
-        { binding: 1, resource: this.views.fft[0] },
-        { binding: 2, resource: { buffer: this.buffers.convertUniforms } }
+        { binding: 2, resource: this.views.fft[0] },
+        { binding: 3, resource: { buffer: this.buffers.convertUniforms } }
       ]
     })
+
+    const ConvertExternalBingGroupLayout = this.convertExternalPipeline.getBindGroupLayout(0)
+    this.makeConvertExternalBingGroup = (externalTexture) => {
+      return this.device.createBindGroup({
+        layout: ConvertExternalBingGroupLayout,
+        entries: [
+          { binding: 1, resource: externalTexture },
+          { binding: 2, resource: this.views.fft[0] },
+          { binding: 3, resource: { buffer: this.buffers.convertUniforms } }
+        ]
+      })
+    }
 
     this.boundaryImagePipeline = this.device.createComputePipeline({
       layout: 'auto',
@@ -494,27 +517,37 @@ export class FFTWebGPU {
   }
 
   render (source) {
-    // In principle we could use importExternalTexture for the live camera to
-    // avoid a copy, but then we need to have different shaders for the camera
-    // and canvas case as external textures are a different type (and don't
-    // support textureLoad).
-    this.device.queue.copyExternalImageToTexture(
-      { source },
-      { texture: this.textures.input },
-      [this.size, this.size]
-    )
 
     const encoder = this.device.createCommandEncoder()
 
-    {
-      const pass = encoder.beginComputePass()
-      pass.setPipeline(this.convertPipeline)
-      pass.setBindGroup(0, this.convertBindGroup)
-      pass.dispatchWorkgroups(
-        Math.ceil(this.size / 8),
-        Math.ceil(this.size / 8)
+    if (source instanceof GPUExternalTexture) {
+      {
+        const pass = encoder.beginComputePass()
+        pass.setPipeline(this.convertExternalPipeline)
+        pass.setBindGroup(0, this.makeConvertExternalBingGroup(source))
+        pass.dispatchWorkgroups(
+          Math.ceil(this.size / 8),
+          Math.ceil(this.size / 8)
+        )
+        pass.end()
+      }
+    } else {
+      this.device.queue.copyExternalImageToTexture(
+        { source },
+        { texture: this.textures.input },
+        [this.size, this.size]
       )
-      pass.end()
+
+      {
+        const pass = encoder.beginComputePass()
+        pass.setPipeline(this.convertPipeline)
+        pass.setBindGroup(0, this.convertBindGroup)
+        pass.dispatchWorkgroups(
+          Math.ceil(this.size / 8),
+          Math.ceil(this.size / 8)
+        )
+        pass.end()
+      }
     }
 
     if (this.#periodicPlusSmooth) {
