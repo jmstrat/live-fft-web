@@ -13,16 +13,16 @@
 <body>
   <main class="dashboard">
     <div class="row">
-      <canvas id="inputCanvas" class="square output"></canvas>
-      <canvas id="gpuCanvas" class="square output"></canvas>
+      <canvas id="inputCanvas" class="square output" title="Input image to be Fourier transformed"></canvas>
+      <canvas id="gpuCanvas" class="square output" title="Fourier transformed image"></canvas>
     </div>
     <div class="row">
-      <canvas id="integrationCanvas" class="output fw"></canvas>
+      <canvas id="integrationCanvas" class="output fw" title="Radial integration of the Fourier transformed image"></canvas>
     </div>
   </main>
 
   <div class="buttons-container">
-    <button id="settingsBtn" class="btn" popovertarget="settingsMenu" aria-label="Settings">
+    <button id="settingsBtn" class="btn" popovertarget="settingsMenu" aria-label="Settings" title="Settings">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
         stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <line x1="3" y1="12" x2="21" y2="12"></line>
@@ -31,11 +31,11 @@
       </svg>
     </button>
 
-    <button id="helpBtn" class="btn" popovertarget="helpPopover" aria-label="Help">
+    <button id="helpBtn" class="btn" popovertarget="helpPopover" aria-label="Help" title="Help">
       ?
     </button>
 
-    <button id="fullscreen-btn" class="btn">
+    <button id="fullscreen-btn" class="btn" aria-label="Fullscreen" title="Fullscreen">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
@@ -43,10 +43,10 @@
     </button>
   </div>
 
-  <div id="settingsMenu" class="popup" popover>
+  <div id="settingsMenu" class="popup" popover title="Settings Menu">
     <h3>Configuration</h3>
     <section>
-      <label>Source Mode</label>
+      <label for="sourceSelect">Source Mode</label>
       <select id="sourceSelect">
         <option default value="generator">Example Images</option>
         <option value="camera">Live Camera</option>
@@ -55,25 +55,25 @@
     </section>
 
     <section id="cameraSection">
-      <label>Camera</label>
+      <label for="videoDevices">Camera</label>
       <select id="videoDevices"></select>
     </section>
     <section id="generatorSection">
-      <label>Pattern</label>
+      <label for="patternSelect">Pattern</label>
       <select id="patternSelect"></select>
     </section>
     <section id="imageSection">
-      <label>Pattern</label>
+      <label for="imageSelect">Pattern</label>
       <select id="imageSelect"></select>
     </section>
 
     <section>
-      <label>Mirror Input</label>
+      <label for="flip-x">Mirror Input</label>
       <input type="checkbox" id="flip-x"/>
     </section>
 
     <section>
-      <label>Input Processing</label>
+      <label for="convert">Input Processing</label>
       <select id="convert">
         <option value="None">Greyscale</option>
         <option value="HammingWindow">Greyscale + Hamming Window</option>
@@ -85,7 +85,7 @@
     </section>
 
     <section>
-      <label>Input Display</label>
+      <label for="input-display">Input Display</label>
       <select id="input-display">
         <option value="raw">Raw</option>
         <option default value="processed">Processed</option>
@@ -93,7 +93,7 @@
     </section>
 
     <section>
-      <label>Colour Mapping</label>
+      <label for="colourMap">Colour Mapping</label>
       <select id="colourMap">
         <option default value="None">Greyscale</option>
         <option value="Viridis">Viridis</option>
@@ -105,12 +105,12 @@
     </section>
 
     <section>
-      <label>Intensity Scale</label>
+      <label for="scale">Intensity Scale</label>
       <input type="range" id="scale" min="1" max="100" value="25"  step="1">
     </section>
   </div>
 
-  <div id="helpPopover" class="popup" popover>
+  <div id="helpPopover" class="popup" popover title="Help">
     <h3>Help</h3>
     <section>
       <h4>What am I looking at?</h4>

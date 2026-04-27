@@ -95,6 +95,17 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
+
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.btn:hover {
+  filter: brightness(1.1);
+}
+
+.btn:active {
+  transform: scale(0.96);
+  filter: brightness(0.95);
 }
 
 #settingsBtn {
