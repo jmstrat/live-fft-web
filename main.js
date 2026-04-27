@@ -1,6 +1,6 @@
 import { FFTWebGPU } from './gpu.js'
 import { Camera } from './camera.js'
-import { Generators, clearCanvas } from './generators.js'
+import { Generators, init as initGenerators } from './generators.js'
 import { ImageCache } from './image-cache.js'
 import { RenderLoop } from './render-loop.js'
 
@@ -10,13 +10,23 @@ import { RenderLoop } from './render-loop.js'
 // is handled by gpu.js and its associated shaders. The "Example Images" come
 // from generators.js
 
-
 const SIZE = 512 // Must be a power of RADIX (default 2)
+
+const gpu = new FFTWebGPU()
+const camera = new Camera(SIZE)
+const imageCache = new ImageCache(SIZE, SIZE)
+initGenerators(SIZE, SIZE)
+let isReady = false
+let lastDrawnImage = null
 
 const SOURCES = {
   CAMERA: 'camera',
   GENERATOR: 'generator',
   IMAGE: 'image'
+}
+
+function getActiveGenerator () {
+  return Generators[settings.currentPattern.value]
 }
 
 const settings = {
@@ -41,6 +51,15 @@ const settings = {
       } else {
         camera.stop()
       }
+
+      if (mode === SOURCES.GENERATOR) {
+        getActiveGenerator().markDirty()
+      }
+
+      if (mode === SOURCES.IMAGE) {
+        lastDrawnImage = null
+      }
+
       loop.start()
     }
   },
@@ -66,7 +85,10 @@ const settings = {
   currentPattern: {
     el: document.getElementById('patternSelect'),
     storageKey: 'generator',
-    default: Object.keys(Generators)[0]
+    default: Object.keys(Generators)[0],
+    onchange: () => {
+      getActiveGenerator().markDirty()
+    }
   },
   currentImage: {
     el: document.getElementById('imageSelect'),
@@ -133,15 +155,6 @@ const elements = {
   errorCode: document.getElementById('errorCode')
 }
 
-const gpu = new FFTWebGPU()
-const generatorCanvas = new OffscreenCanvas(SIZE, SIZE)
-const ctx = generatorCanvas.getContext('2d', { willReadFrequently: true })
-
-const camera = new Camera(SIZE)
-const imageCache = new ImageCache(SIZE, SIZE)
-
-let isReady = false
-
 const loop = new RenderLoop(
   render,
   // Schedule a new frame
@@ -168,6 +181,43 @@ const loop = new RenderLoop(
     }
   }
 )
+
+async function render () {
+  let source
+  let needsClose = false
+
+  const mode = settings.sourceMode.value
+
+  if (mode === SOURCES.CAMERA) {
+    source = await camera.getImageBitmap()
+    if (!source) {
+      return
+    }
+    needsClose = true
+  } else if (mode === SOURCES.GENERATOR) {
+    const generator = getActiveGenerator()
+    if (!generator.isDirty()) {
+      return
+    }
+    generator.draw()
+    source = generator.canvas
+  } else if (mode === SOURCES.IMAGE) {
+    source = imageCache.get(settings.currentImage.value)
+    if (!source) {
+      source = imageCache.black
+    }
+
+    if (source === lastDrawnImage) {
+      return
+    }
+    lastDrawnImage = source
+  }
+
+  gpu.render(source)
+  if (needsClose) {
+    source.close()
+  }
+}
 
 async function init () {
   elements.input.width = elements.input.height = SIZE
@@ -340,36 +390,6 @@ function setupFullscreen () {
     console.error(err)
   }
 })
-}
-
-async function render () {
-  let source
-  let needsClose = false
-
-  const mode = settings.sourceMode.value
-
-  if (mode === SOURCES.CAMERA) {
-    source = await camera.getImageBitmap()
-    if (!source) {
-      return
-    }
-    needsClose = true
-  } else if (mode === SOURCES.GENERATOR) {
-    clearCanvas(ctx)
-    Generators[settings.currentPattern.value](ctx)
-    source = generatorCanvas
-  } else if (mode === SOURCES.IMAGE) {
-    clearCanvas(ctx)
-    source = imageCache.get(settings.currentImage.value)
-    if (!source) {
-      source = imageCache.black
-    }
-  }
-
-  gpu.render(source)
-  if (needsClose) {
-    source.close()
-  }
 }
 
 function showError (err) {

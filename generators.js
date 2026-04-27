@@ -1,229 +1,169 @@
 // This file provides the procedurally generated "Example Images"
-// Each image is simply a function that takes a canvas 2D context and
-// draws to it once per frame. They can be animated or static.
 
-const FG = 'white'
-const BG = 'black'
+const oscillators = {
+  sin: () => Math.sin(Date.now() * 0.0005)
+}
 
-const TIME_SCALE = 0.0005
-const PULSE_AMPLITUDE = 0.9
+const DEFAULT_PALETTE = {
+  fg: 'white',
+  bg: 'black'
+}
 
-const CIRCLE_SIZE_F = 0.05
+class Generator {
+  #canvas
+  #ctx
+  #dirty = true
+  #config
+  #palette
 
-const RECTANGLE_SIZE_F = [0.05, 0.25]
-const HEX_SIZE_F = 0.25
-const LATTICE_SIZE_F = 1/16
-const LATTICE_R_F = 1/8
+  constructor (config = {}, palette = DEFAULT_PALETTE) {
+    this.#config = config
+    this.#palette = palette
+  }
 
-let STATE = null
+  init (canvas, ctx) {
+    this.#canvas = canvas
+    this.#ctx = ctx
+  }
 
-// Some of these are static, in principle we could pause the GPU pipeline
-// when a static image is selected
+  draw () {
+    this.clear()
+    this.#dirty = false
+    this.render()
+  }
 
-export const Generators = {
-  Circle: (ctx) => {
-    const time = Date.now() * TIME_SCALE
+  render () {
+    // Override in subclasses
+  }
 
-    ctx.fillStyle = FG
-    ctx.translate(ctx.canvas.width / 2, ctx.canvas.height / 2)
+  get config () { return this.#config }
+  get palette () { return this.#palette }
+  get canvas () { return this.#canvas }
+  get ctx () { return this.#ctx }
+  get width () { return this.#canvas.width }
+  get height () { return this.#canvas.height }
 
-    const r = ctx.canvas.width * CIRCLE_SIZE_F
+  isDirty () {
+    return this.#dirty
+  }
 
-    const radius = r + Math.sin(time) * (r * PULSE_AMPLITUDE)
+  markDirty () {
+    this.#dirty = true
+  }
 
-    ctx.beginPath()
-    ctx.arc(0, 0, radius, 0, Math.PI * 2)
-    ctx.fill()
+  clear () {
+    this.ctx.fillStyle = this.palette.bg
+    this.ctx.fillRect(0, 0, this.width, this.height)
+  }
 
-    ctx.setTransform(1, 0, 0, 1, 0, 0)
-  },
-  Rectangle: (ctx) => {
-    const time = Date.now() * TIME_SCALE
+  resetTransform () {
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0)
+  }
 
-    ctx.fillStyle = FG
-    ctx.translate(ctx.canvas.width / 2, ctx.canvas.height / 2)
-    ctx.rotate(Math.sin(time) * Math.PI / 2)
+  getDelta () {
+    const key = this.config.oscillator
+    return key ? oscillators[key]() : 0
+  }
+}
 
-    ctx.beginPath()
-    ctx.rect(
-      -ctx.canvas.width * RECTANGLE_SIZE_F[0] / 2,
-      -ctx.canvas.height * RECTANGLE_SIZE_F[1] / 2,
-      ctx.canvas.width * RECTANGLE_SIZE_F[0],
-      ctx.canvas.height * RECTANGLE_SIZE_F[1]
+class Circle extends Generator {
+  render () {
+    const { sizeFactor, pulseAmplitude } = this.config
+    const r = this.width * sizeFactor
+    const radius = r + this.getDelta() * (r * pulseAmplitude)
+
+    this.ctx.fillStyle = this.palette.fg
+    this.ctx.translate(this.width / 2, this.height / 2)
+    this.ctx.beginPath()
+    this.ctx.arc(0, 0, radius, 0, Math.PI * 2)
+    this.ctx.fill()
+    this.resetTransform()
+    this.markDirty()
+  }
+}
+
+class Rectangle extends Generator {
+  render () {
+    const { sizeFactors } = this.config
+    this.ctx.fillStyle = this.palette.fg
+    this.ctx.translate(this.width / 2, this.height / 2)
+    this.ctx.rotate(this.getDelta() * Math.PI / 2)
+
+    this.ctx.beginPath()
+    this.ctx.rect(
+      -this.width * sizeFactors[0] / 2,
+      -this.height * sizeFactors[1] / 2,
+      this.width * sizeFactors[0],
+      this.height * sizeFactors[1]
     )
-    ctx.fill()
+    this.ctx.fill()
+    this.resetTransform()
+    this.markDirty()
+  }
+}
 
-    ctx.setTransform(1, 0, 0, 1, 0, 0)
-  },
-  Hexagon: (ctx) => {
-    const time = Date.now() * TIME_SCALE
-    const size = ctx.canvas.width * HEX_SIZE_F / 2
+class Hexagon extends Generator {
+  render () {
+    const { sizeFactor } = this.config
+    const size = this.width * sizeFactor / 2
+    this.ctx.fillStyle = this.palette.fg
+    this.ctx.translate(this.width / 2, this.height / 2)
+    this.ctx.rotate(this.getDelta() * Math.PI / 2)
 
-    ctx.fillStyle = FG
-    ctx.translate(ctx.canvas.width / 2, ctx.canvas.height / 2)
-    ctx.rotate(Math.sin(time) * Math.PI / 2)
-
-    ctx.beginPath()
+    this.ctx.beginPath()
     for (let i = 0; i < 6; i++) {
       const angle = (Math.PI / 3) * i
-      const x = size * Math.cos(angle)
-      const y = size * Math.sin(angle)
-      if (i === 0) ctx.moveTo(x, y)
-      else ctx.lineTo(x, y)
+      this.ctx.lineTo(size * Math.cos(angle), size * Math.sin(angle))
     }
-    ctx.closePath()
-    ctx.fill()
-
-    ctx.setTransform(1, 0, 0, 1, 0, 0)
-  },
-  'Monodisperse Circles': (ctx) => {
-    if (!(STATE instanceof Liquid && STATE.id === 'monodisperse')) {
-      STATE = new Liquid({
-        count: 400,
-        width: ctx.canvas.width,
-        height: ctx.canvas.height
-      })
-      STATE.id = 'monodisperse'
-    }
-    STATE.draw(ctx)
-  },
-  'Polydisperse Circles': (ctx) => {
-    if (!(STATE instanceof Liquid && STATE.id === 'polydisperse')) {
-      STATE = new Liquid({
-        count: 400,
-        width: ctx.canvas.width,
-        height: ctx.canvas.height,
-        polydispersity: 0.5
-      })
-      STATE.id = 'polydisperse'
-    }
-    STATE.draw(ctx)
-  },
-  'Polydisperse Ellipses': (ctx) => {
-    if (!(STATE instanceof Liquid && STATE.id === 'ellipse')) {
-      STATE = new Liquid({
-        count: 200,
-        width: ctx.canvas.width,
-        height: ctx.canvas.height,
-        polydispersity: 0.5,
-        eccentricity: { min: 1.5, max: 3.5 },
-        angleVariance: 0.02,
-        emptyFactor: 5
-      })
-      STATE.id = 'ellipse'
-    }
-    STATE.draw(ctx)
-  },
-
-  'Lattice': (ctx) => {
-    const spacing = ctx.canvas.width * LATTICE_SIZE_F
-    const radius = spacing * LATTICE_R_F
-    const vSpacing = spacing * (Math.sqrt(3) / 2)
-
-    ctx.fillStyle = FG
-
-    const xmax = ctx.canvas.width - spacing
-    const ymax = ctx.canvas.height - vSpacing
-
-    for (let y = spacing, row = 0; y <= ymax; y += vSpacing, row++) {
-      const offset = (row % 2) * (spacing / 2)
-
-      for (let x = spacing - offset; x <= xmax; x += spacing) {
-        ctx.beginPath()
-        ctx.arc(x, y, radius, 0, Math.PI * 2)
-        ctx.fill()
-      }
-    }
-  },
-  'Big Lattice': (ctx) => {
-    const marginX = 0
-    const marginY = 0
-
-    const spacing = 16
-    const radius = 2
-    const vSpacing = spacing
-
-    ctx.fillStyle = FG
-
-    const xMin = marginX
-    const xMax = ctx.canvas.width - marginX
-    const yMin = marginY
-    const yMax = ctx.canvas.height - marginY
-
-    for (let y = yMin, row = 0; y <= yMax; y += vSpacing, row++) {
-      const offset = (row % 2) * (spacing / 2)
-
-      for (let x = xMin + offset; x <= xMax; x += spacing) {
-        ctx.beginPath()
-        ctx.arc(x, y, radius, 0, Math.PI * 2)
-        ctx.fill()
-      }
-    }
-
+    this.ctx.closePath()
+    this.ctx.fill()
+    this.resetTransform()
+    this.markDirty()
   }
 }
 
-export function clearCanvas (ctx) {
-  ctx.fillStyle = BG
-  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
-}
+class Liquid extends Generator {
+  #particles = null
 
-class Liquid {
-  constructor ({
-    count,
-    width,
-    height,
-    polydispersity = 0,
-    eccentricity = { min: 1, max: 1},
-    angleVariance = 0,
-    emptyFactor = 1.75
-  }) {
-    this.count = count
-    this.width = width
-    this.height = height
-    this.radius = Math.sqrt((width * height) / (count * emptyFactor * Math.PI))
+  init (...args) {
+    super.init(...args)
+    const {
+      count,
+      polydispersity = 0,
+      eccentricity = { min: 1, max: 1 },
+      angleVariance = 0,
+      emptyFactor = 1.75
+    } = this.config
+
+    const radius = Math.sqrt((this.width * this.height) / (count * emptyFactor * Math.PI))
+    this.jitter = 0.003 * this.width
     this.repulsion = 0.2
-    this.jitter = 0.003 * width
 
-    this.polydispersity = polydispersity
-    this.eccentricity = eccentricity
-    this.angleVariance = angleVariance
-    this.particles = this.init()
+    this.#particles = Array.from({ length: count }, () => {
+      const r = radius + radius * (Math.random() - 0.5) * polydispersity
+      const factor = eccentricity.min + Math.random() * (eccentricity.max - eccentricity.min)
+      return {
+        x: Math.random() * this.width,
+        y: Math.random() * this.height,
+        rx: r * factor,
+        ry: r / factor,
+        r: r,
+        angle: 2 * Math.PI * (Math.random() - 0.5) * angleVariance
+      }
+    })
   }
 
-  init () {
-    return Array.from({ length: this.count },
-      () => this.makeParticle()
-    )
-  }
+  render () {
+    this.ctx.fillStyle = this.palette.fg
+    const particles = this.#particles
 
-  makeParticle () {
-    const r = this.radius + this.radius * (Math.random() - 0.5) * this.polydispersity
-
-    const factor = this.eccentricity.min + Math.random() * (this.eccentricity.max - this.eccentricity.min)
-
-    return {
-      x: Math.random() * this.width,
-      y: Math.random() * this.height,
-      rx: r * factor,
-      ry: r / factor,
-      r: r, // Collision radius
-      angle: 2 * Math.PI * (Math.random() - 0.5) * this.angleVariance
-    }
-  }
-
-  draw (ctx) {
-    const { width, height } = ctx.canvas
-    ctx.fillStyle = FG
-
-    for (let i = 0; i < this.particles.length; i++) {
-      let p1 = this.particles[i]
-
+    for (let i = 0; i < particles.length; i++) {
+      let p1 = particles[i]
       p1.x += (Math.random() - 0.5) * this.jitter
       p1.y += (Math.random() - 0.5) * this.jitter
 
-      for (let j = i + 1; j < this.particles.length; j++) {
-        let p2 = this.particles[j]
+      for (let j = i + 1; j < particles.length; j++) {
+        let p2 = particles[j]
         const dx = p2.x - p1.x
         const dy = p2.y - p1.y
         const dist = Math.sqrt(dx * dx + dy * dy)
@@ -233,10 +173,8 @@ class Liquid {
           const overlap = minDist - dist
           const nx = dx / (dist || 1)
           const ny = dy / (dist || 1)
-
           const moveX = nx * overlap * this.repulsion
           const moveY = ny * overlap * this.repulsion
-
           p1.x -= moveX
           p1.y -= moveY
           p2.x += moveX
@@ -245,16 +183,83 @@ class Liquid {
       }
 
       const maxR = Math.max(p1.rx, p1.ry)
-      p1.x = Math.max(maxR, Math.min(width - maxR, p1.x))
-      p1.y = Math.max(maxR, Math.min(height - maxR, p1.y))
+      p1.x = Math.max(maxR, Math.min(this.width - maxR, p1.x))
+      p1.y = Math.max(maxR, Math.min(this.height - maxR, p1.y))
 
-      this.drawParticle(ctx, p1)
+      this.ctx.beginPath()
+      this.ctx.ellipse(p1.x, p1.y, p1.rx, p1.ry, p1.angle, 0, Math.PI * 2)
+      this.ctx.fill()
+    }
+    this.markDirty()
+  }
+}
+
+class Lattice extends Generator {
+  render () {
+    const { spacingFactor, radiusFactor, type = 'hex', margin } = this.config
+    const spacing = this.width * spacingFactor
+    const radius = this.width * radiusFactor
+    const isHex = type === 'hex'
+    const vSpacing = isHex ? spacing * (Math.sqrt(3) / 2) : spacing
+
+    const xmin = spacing * margin
+    const xmax = this.width - spacing * margin
+
+    const ymin = spacing * margin
+    const ymax = this.height - vSpacing * margin
+
+    this.ctx.fillStyle = this.palette.fg
+    for (let y = ymin, row = 0; y <= ymax; y += vSpacing, row++) {
+      const offset = (row % 2) * (spacing / 2)
+
+      for (let x = xmin + offset; x <= xmax; x += spacing) {
+        this.ctx.beginPath()
+        this.ctx.arc(x, y, radius, 0, Math.PI * 2)
+        this.ctx.fill()
+      }
     }
   }
+}
 
-  drawParticle (ctx, p) {
-    ctx.beginPath()
-    ctx.ellipse(p.x, p.y, p.rx, p.ry, p.angle, 0, Math.PI * 2)
-    ctx.fill()
-  }
+export const Generators = {
+  Circle: new Circle({
+    sizeFactor: 0.05,
+    pulseAmplitude: 0.9,
+    oscillator: 'sin'
+  }),
+  Rectangle: new Rectangle({
+    sizeFactors: [0.05, 0.25],
+    oscillator: 'sin'
+  }),
+  Hexagon: new Hexagon({
+    sizeFactor: 0.25,
+    oscillator: 'sin'
+  }),
+  'Monodisperse Circles': new Liquid({ count: 400 }),
+  'Polydisperse Circles': new Liquid({ count: 400, polydispersity: 0.5 }),
+  'Polydisperse Ellipses': new Liquid({
+    count: 200,
+    polydispersity: 0.5,
+    eccentricity: { min: 1.5, max: 3.5 },
+    angleVariance: 0.02,
+    emptyFactor: 5
+  }),
+  'Lattice': new Lattice({
+    spacingFactor: 1 / 16,
+    radiusFactor: 1 / 128,
+    margin: 1,
+    type: 'hex'
+  }),
+  'Big Lattice': new Lattice({
+    spacingFactor: 1 / 32,
+    radiusFactor: 1 / 256,
+    margin: 0,
+    type: 'square'
+  })
+}
+
+export function init (width, height) {
+  const sharedCanvas = new OffscreenCanvas(width, height)
+  const ctx = sharedCanvas.getContext('2d', { willReadFrequently: true })
+  Object.values(Generators).forEach(g => g.init(sharedCanvas, ctx))
 }
