@@ -17,8 +17,7 @@ export class ImageCache {
   async add (file) {
     const original = await createImageBitmap(file)
 
-    this.#ctx.clearRect(0, 0, this.width, this.height)
-    this.#ctx.drawImage(original, 0, 0, this.width, this.height)
+    this.#draw(original)
 
     const bitmap = this.#canvas.transferToImageBitmap()
     const size = this.width * this.height * 4
@@ -28,6 +27,31 @@ export class ImageCache {
 
     this.#storage.set(file.name, { bitmap, size })
     this.#currentMemory += size
+  }
+
+  #draw (bitmap) {
+    const canvasW = this.width
+    const canvasH = this.height
+
+    const imgRatio = bitmap.width / bitmap.height
+    const canvasRatio = canvasW / canvasH
+
+    let sx, sy, sw, sh
+
+    if (imgRatio > canvasRatio) {
+        sw = bitmap.height * canvasRatio
+        sh = bitmap.height
+        sx = (bitmap.width - sw) / 2
+        sy = 0
+    } else {
+        sw = bitmap.width
+        sh = bitmap.width / canvasRatio
+        sx = 0
+        sy = (bitmap.height - sh) / 2
+    }
+
+    this.#ctx.clearRect(0, 0, canvasW, canvasH)
+    this.#ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, canvasW, canvasH)
   }
 
   get (name) {
