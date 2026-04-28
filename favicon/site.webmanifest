@@ -1,22 +1,36 @@
 {
+  "id": "/live-fft-web/",
   "name": "Live FFT",
   "short_name": "Live FFT",
+  "description": "A live 2D FFT as an educational tool for understanding diffraction.",
+  "categories": ["utilities", "education", "science"],
+  "lang": "en",
   "start_url": "../index.html",
+  "theme_color": "#007bff",
+  "background_color": "#0f1115",
   "icons": [
     {
       "src": "web-app-manifest-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     },
     {
       "src": "web-app-manifest-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ],
-  "theme_color": "#ffffff",
-  "background_color": "#ffffff",
-  "display": "standalone"
+  "screenshots": [
+    {
+      "src": "../screenshots/desktop-main.png",
+      "sizes": "1280x1024",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Live FFT"
+    }
+  ],
+  "display": "standalone",
+  "orientation": "landscape"
 }
