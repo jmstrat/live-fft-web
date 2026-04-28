@@ -48,9 +48,13 @@ const settings = {
     onchange: async (mode) => {
       await loop.stop()
       const isCamera = mode === SOURCES.CAMERA
+      const isGenerator = mode === SOURCES.GENERATOR
+      const isImage = mode === SOURCES.IMAGE
+
       elements.camSection.classList.toggle('hidden', !isCamera)
-      elements.genSection.classList.toggle('hidden', mode !== SOURCES.GENERATOR)
-      elements.imageSection.classList.toggle('hidden', mode !== SOURCES.IMAGE)
+      elements.genSection.classList.toggle('hidden', !isGenerator)
+      elements.imageSection.classList.toggle('hidden', !isImage)
+
       if (isCamera) {
         try {
           const deviceID = await camera.start(settings.deviceId.value)
@@ -64,6 +68,7 @@ const settings = {
         camera.stop()
       }
 
+      warnIfImageModeAndNoImages()
       markDirty()
       loop.start()
     }
@@ -168,6 +173,7 @@ const elements = {
 
   // Overlays
   loading: document.getElementById('loading'),
+  noImages: document.getElementById('no-images'),
   drop: document.getElementById('drop'),
   errorOverlay: document.getElementById('errorOverlay'),
   errorTitle: document.getElementById('errorTitle'),
@@ -301,6 +307,18 @@ function refreshImageOptions () {
   }
 }
 
+function warnIfImageModeAndNoImages () {
+  if (settings.sourceMode.value === SOURCES.IMAGE) {
+    const size = imageCache.size
+    if (size < 1) {
+      elements.noImages.classList.remove('hidden')
+      return
+    }
+  }
+
+  elements.noImages.classList.add('hidden')
+}
+
 async function initSettings () {
   for (const cfg of Object.values(settings)) {
     const saved = cfg.storageKey ? localStorage.getItem(cfg.storageKey) : null
@@ -378,6 +396,7 @@ function setupDragAndDrop () {
 
       if (hasImage) {
         elements.drop.classList.remove('hidden')
+        elements.noImages.classList.add('hidden')
         e.dataTransfer.dropEffect = 'copy'
 
         if (hasMultipleImages) {
@@ -393,6 +412,7 @@ function setupDragAndDrop () {
 
   window.addEventListener('dragleave', e => {
     elements.drop.classList.add('hidden')
+    warnIfImageModeAndNoImages()
   })
 
   window.addEventListener('drop', e => {
@@ -412,6 +432,7 @@ function setupDragAndDrop () {
     refreshImageOptions()
     settings.sourceMode.el.value = "image"
     settings.sourceMode.el.dispatchEvent(new Event('change'))
+    warnIfImageModeAndNoImages()
   })
 }
 

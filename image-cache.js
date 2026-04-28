@@ -95,4 +95,8 @@ export class ImageCache {
   get names () {
     return Array.from(this.#storage.keys())
   }
+
+  get size () {
+    return this.#storage.size
+  }
 }

@@ -77,6 +77,8 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+
+  z-index: 2;
 }
 
 .btn {
@@ -254,7 +256,6 @@ input[type="checkbox"]:focus {
   z-index: 9999;
   padding: 2rem;
   text-align: center;
-  pointer-events: none;
 }
 
 .card {
@@ -273,7 +274,6 @@ input[type="checkbox"]:focus {
 .card p {
   line-height: 1.6;
   color: #ccc;
-  white-space: pre-line;
 }
 
 .card code {
@@ -297,6 +297,10 @@ input[type="checkbox"]:focus {
   color: #ff4444;
 }
 
+#errorMessage {
+  white-space: pre-line;
+}
+
 .card.message {
   border: 1px solid #4444ff;
 }
@@ -311,6 +315,17 @@ input[type="checkbox"]:focus {
 
 .contains-plural .plural {
   display: inline;
+}
+
+#drop {
+  pointer-events: auto;
+  z-index: 99;
+  pointer-events: none;
+}
+
+#no-images {
+  z-index: 0;
+  pointer-events: none;
 }
 
 footer {
