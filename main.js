@@ -42,7 +42,7 @@ function markDirty () {
 const settings = {
   // Sources
   sourceMode: {
-    el: document.getElementById('sourceSelect'),
+    el: document.getElementById('source-select'),
     storageKey: 'source',
     default: SOURCES.GENERATOR,
     onchange: async (mode) => {
@@ -74,7 +74,7 @@ const settings = {
     }
   },
   deviceId: {
-    el: document.getElementById('videoDevices'),
+    el: document.getElementById('camera-select'),
     storageKey: 'camera',
     default: null,
     onchange: async (v) => {
@@ -93,7 +93,7 @@ const settings = {
     }
   },
   currentPattern: {
-    el: document.getElementById('patternSelect'),
+    el: document.getElementById('generator-select'),
     storageKey: 'generator',
     default: Object.keys(Generators)[0],
     onchange: () => {
@@ -101,13 +101,13 @@ const settings = {
     }
   },
   currentImage: {
-    el: document.getElementById('imageSelect'),
+    el: document.getElementById('image-select'),
     default: ""
   },
 
   // Input
   inputDisplay: {
-    el: document.getElementById('input-display'),
+    el: document.getElementById('input-display-select'),
     storageKey: 'input-display-mode',
     default: 'processed',
     onchange: (v) => {
@@ -116,7 +116,7 @@ const settings = {
     }
   },
   convertOption: {
-    el: document.getElementById('convert'),
+    el: document.getElementById('input-convert-select'),
     storageKey: 'convert',
     default: 'PeriodicPlusSmooth',
     onchange: (v) => {
@@ -125,7 +125,7 @@ const settings = {
     }
   },
   flipX: {
-    el: document.getElementById('flip-x'),
+    el: document.getElementById('flip-x-checkbox'),
     storageKey: 'flip-x',
     default: false,
     onchange: (v) => {
@@ -136,7 +136,7 @@ const settings = {
 
   // Output
   colourMap: {
-    el: document.getElementById('colourMap'),
+    el: document.getElementById('colourmap-select'),
     storageKey: 'colour-map',
     default: 'None',
     onchange: (v) => {
@@ -145,7 +145,7 @@ const settings = {
     }
   },
   intensityScale: {
-    el: document.getElementById('scale'),
+    el: document.getElementById('intensity-range'),
     storageKey: 'intensity-scale',
     default: 0.25,
     toUI: (v) => v * 100,
@@ -159,26 +159,26 @@ const settings = {
 
 const elements = {
   // Canvases
-  input: document.getElementById('inputCanvas'),
-  output: document.getElementById('gpuCanvas'),
-  integration: document.getElementById('integrationCanvas'),
+  input: document.getElementById('input-canvas'),
+  output: document.getElementById('fft-canvas'),
+  integration: document.getElementById('integration-canvas'),
 
   // Input sections
-  camSection: document.getElementById('cameraSection'),
-  genSection: document.getElementById('generatorSection'),
-  imageSection: document.getElementById('imageSection'),
+  camSection: document.getElementById('camera-section'),
+  genSection: document.getElementById('generator-section'),
+  imageSection: document.getElementById('image-section'),
 
   // Buttons
   fullscreenBtn: document.getElementById('fullscreen-btn'),
 
   // Overlays
-  loading: document.getElementById('loading'),
-  noImages: document.getElementById('no-images'),
-  drop: document.getElementById('drop'),
-  errorOverlay: document.getElementById('errorOverlay'),
-  errorTitle: document.getElementById('errorTitle'),
-  errorMsg: document.getElementById('errorMessage'),
-  errorCode: document.getElementById('errorCode')
+  loading: document.getElementById('loading-overlay'),
+  noImages: document.getElementById('no-images-overlay'),
+  drop: document.getElementById('drop-overlay'),
+  errorOverlay: document.getElementById('error-overlay'),
+  errorTitle: document.getElementById('error-title'),
+  errorMsg: document.getElementById('error-message'),
+  errorCode: document.getElementById('error-code')
 }
 
 const loop = new RenderLoop(
@@ -263,7 +263,7 @@ async function init () {
     showError(err)
     return
   } finally {
-    loading.classList.add('hidden')
+    elements.loading.classList.add('hidden')
   }
 }
 

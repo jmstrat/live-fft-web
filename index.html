@@ -25,19 +25,19 @@
 <body>
   <main class="dashboard">
     <div class="row">
-      <canvas id="inputCanvas" class="square output"
+      <canvas id="input-canvas" class="square output"
         title="Input image to be Fourier transformed"
         aria-label="Input image to be Fourier transformed" role="img">
         <p>Live visualization of the input signal before Fourier transformation.</p>
       </canvas>
-      <canvas id="gpuCanvas" class="square output"
+      <canvas id="fft-canvas" class="square output"
         title="Fourier transformed image"
         aria-label="Fourier transformed image" role="img">
           <p>Live visualization of the input signal after Fourier transformation.</p>
       </canvas>
     </div>
     <div class="row">
-      <canvas id="integrationCanvas" class="output fw"
+      <canvas id="integration-canvas" class="output fw"
         title="Radial integration of the Fourier transformed image"
         aria-label="Radial integration of the Fourier transformed image" role="img">
           <p>Live radial integration of the Fourier transformed signal.</p>
@@ -47,7 +47,7 @@
 
   <div class="buttons-container">
     <div id="settings-btn" class="btn-wrapper">
-      <button class="btn" popovertarget="settingsMenu" aria-label="Settings" title="Settings">
+      <button class="btn" popovertarget="settings-popup" aria-label="Settings" title="Settings">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round"
           aria-hidden="true">
@@ -59,7 +59,7 @@
     </div>
 
     <div id="help-btn" class="btn-wrapper">
-      <button class="btn" popovertarget="helpPopover" aria-label="Help" title="Help">
+      <button class="btn" popovertarget="help-popup" aria-label="Help" title="Help">
         <span aria-hidden="true">?</span>
       </button>
     </div>
@@ -75,38 +75,38 @@
     </div>
   </div>
 
-  <div id="settingsMenu" class="popup" popover role="dialog" aria-labelledby="settingsTitle">
-    <h3 id="settingsTitle">Configuration</h3>
+  <div id="settings-popup" class="popup" popover role="dialog" aria-labelledby="settings-title">
+    <h3 id="settings-title">Configuration</h3>
     <section>
-      <label for="sourceSelect">Source Mode</label>
-      <select id="sourceSelect">
+      <label for="source-select">Source Mode</label>
+      <select id="source-select">
         <option selected value="generator">Example Images</option>
         <option value="camera">Live Camera</option>
         <option value="image">User Images</option>
       </select>
     </section>
 
-    <section id="cameraSection">
-      <label for="videoDevices">Camera</label>
-      <select id="videoDevices"></select>
+    <section id="camera-section">
+      <label for="camera-select">Camera</label>
+      <select id="camera-select"></select>
     </section>
-    <section id="generatorSection">
-      <label for="patternSelect">Pattern</label>
-      <select id="patternSelect"></select>
+    <section id="generator-section">
+      <label for="generator-select">Pattern</label>
+      <select id="generator-select"></select>
     </section>
-    <section id="imageSection">
-      <label for="imageSelect">Pattern</label>
-      <select id="imageSelect"></select>
-    </section>
-
-    <section>
-      <label for="flip-x">Mirror Input</label>
-      <input type="checkbox" id="flip-x"/>
+    <section id="image-section">
+      <label for="image-select">Pattern</label>
+      <select id="image-select"></select>
     </section>
 
     <section>
-      <label for="convert">Input Processing</label>
-      <select id="convert">
+      <label for="flip-x-checkbox">Mirror Input</label>
+      <input type="checkbox" id="flip-x-checkbox"/>
+    </section>
+
+    <section>
+      <label for="input-convert-select">Input Processing</label>
+      <select id="input-convert-select">
         <option value="None">Greyscale</option>
         <option value="HammingWindow">Greyscale + Hamming Window</option>
         <option value="HannWindow">Greyscale + Hahn Window</option>
@@ -117,16 +117,16 @@
     </section>
 
     <section>
-      <label for="input-display">Input Display</label>
-      <select id="input-display">
+      <label for="input-display-select">Input Display</label>
+      <select id="input-display-select">
         <option value="raw">Raw</option>
         <option selected value="processed">Processed</option>
       </select>
     </section>
 
     <section>
-      <label for="colourMap">Colour Mapping</label>
-      <select id="colourMap">
+      <label for="colourmap-select">Colour Mapping</label>
+      <select id="colourmap-select">
         <option selected value="None">Greyscale</option>
         <option value="Viridis">Viridis</option>
         <option value="Plasma">Plasma</option>
@@ -137,13 +137,13 @@
     </section>
 
     <section>
-      <label for="scale">Intensity Scale</label>
-      <input type="range" id="scale" min="1" max="100" value="25"  step="1">
+      <label for="intensity-range">Intensity Scale</label>
+      <input type="range" id="intensity-range" min="1" max="100" value="25"  step="1">
     </section>
   </div>
 
-  <div id="helpPopover" class="popup" popover role="dialog" aria-labelledby="helpTitle">
-    <h3 id="helpTitle">Help</h3>
+  <div id="help-popup" class="popup" popover role="dialog" aria-labelledby="help-title">
+    <h3 id="help-title">Help</h3>
     <section>
       <h4>What am I looking at?</h4>
       <p>The screen is split into three sections:</p>
@@ -184,22 +184,22 @@
     </section>
   </div>
 
-  <div id="errorOverlay" class="overlay hidden" aria-live="assertive" role="alert">
+  <div id="error-overlay" class="overlay hidden" aria-live="assertive" role="alert">
     <div class="card error">
-      <h2 id="errorTitle">Error</h2>
-      <p id="errorMessage">An unexpected error occurred.</p>
-      <code id="errorCode" class="hidden"></code>
+      <h2 id="error-title">Error</h2>
+      <p id="error-message">An unexpected error occurred.</p>
+      <code id="error-code" class="hidden"></code>
     </div>
   </div>
 
-  <div id="loading" class="overlay" aria-live="polite" role="status">
+  <div id="loading-overlay" class="overlay" aria-live="polite" role="status">
     <div class="card message">
       <h2>Loading</h2>
       <p>Please wait...</p>
     </div>
   </div>
 
-  <div id="no-images" class="overlay hidden" aria-live="polite" role="status">
+  <div id="no-images-overlay" class="overlay hidden" aria-live="polite" role="status">
     <div class="card message">
       <h2>Drag & Drop images onto the page</h2>
       <p>
@@ -210,7 +210,7 @@
     </div>
   </div>
 
-  <div id="drop" class="overlay hidden" aria-live="polite" role="status">
+  <div id="drop-overlay" class="overlay hidden" aria-live="polite" role="status">
     <div class="card message">
       <h2>Drop the image<span class="plural">s</span>!</h2>
     </div>

@@ -138,11 +138,11 @@ body {
   margin-top: 0.6rem;
 }
 
-#settingsMenu {
+#settings-popup {
   position-anchor: --anchor-settings;
 }
 
-#helpPopover {
+#help-popup {
   position-anchor: --anchor-help;
   width: 500px;
 }
@@ -301,7 +301,7 @@ input[type="checkbox"]:focus {
   color: #ff4444;
 }
 
-#errorMessage {
+#error-message {
   white-space: pre-line;
 }
 
@@ -321,13 +321,13 @@ input[type="checkbox"]:focus {
   display: inline;
 }
 
-#drop {
+#drop-overlay {
   pointer-events: auto;
   z-index: 99;
   pointer-events: none;
 }
 
-#no-images {
+#no-images-overlay {
   z-index: 0;
   pointer-events: none;
 }
