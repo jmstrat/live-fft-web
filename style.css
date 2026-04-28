@@ -136,6 +136,9 @@ body {
   top: anchor(bottom);
   right: anchor(right);
   margin-top: 0.6rem;
+
+  overflow: scroll;
+  max-height: 66vh;
 }
 
 #settings-popup {

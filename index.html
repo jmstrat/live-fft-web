@@ -156,12 +156,13 @@
       <ul>
         <li>
           On the left is the input image, you can choose in the settings menu
-          whether this is a Live capture from your webcam, or one of the sample
-          images included with this program.
+          whether this is a Live capture from your webcam, one of the sample
+          images included with this program, or any image that you drag and drop
+          onto the window.
         </li>
         <li>
           On the right is the live Fourier transformed version of that image. It
-          displays the magnitude of the fourier transform with a logarithmic
+          displays the magnitude of the Fourier transform with a logarithmic
           scaling.
         </li>
         <li>
@@ -186,6 +187,54 @@
         would look like for a variety of different structures. Simply hold a piece
         of paper with a structure on it to the camera and see the Fourier transform
         live. There are also a variety of examples built-in to the program.
+      </p>
+    </section>
+
+    <section>
+      <h4>How to interpret it?</h4>
+      <p>
+        The pattern on the right represents the reciprocal space of the input image.
+        Because of the inverse relationship between real and reciprocal space, the size
+        and orientation of your features will appear &ldquo;flipped.&rdquo;
+      </p>
+
+      <h5>Size and Shape (The Form Factor)</h5>
+      <p>
+        If your particles are isotropic, you will see concentric rings in the scattering
+        pattern. A small circle produces a broad, spread-out pattern, while a larger
+        circle produces a tight, narrow pattern. If your particles are anisotropic,
+        the scattering pattern will appear stretched in the opposite direction;
+        e.g. a horizontal oval in your image will create a vertical streak in the
+        Fourier transformed image.
+      </p>
+
+      <h5>Order and Spacing (The Structure Factor)</h5>
+      <p>
+        When particles are arranged in an ordered lattice, the smooth rings break up
+        into sharp, distinct spots (Bragg peaks). The positions of these spots tell
+        you about the symmetry and spacing of the &ldquo;crystal.&rdquo; A closely
+        packed lattice will push these spots further from the centre, while a sparse
+        lattice brings them closer together. If the arrangement is disordered (like a
+        liquid or glass), these sharp spots will blur back into diffuse &ldquo;halos,&rdquo;
+        representing the average distance between particles rather than a fixed grid.
+      </p>
+
+      <h5>Finite Size Effects</h5>
+      <p>
+        The Fourier transform of a finite lattice is effectively the transform of a single
+        particle (the form factor) sampled by the transform of the lattice (the structure
+        factor). For small lattices, the sampling functions are broad, allowing the
+        intensity contribution from individual particles to remain visible as diffuse
+        features. As the lattice extent increases, these functions narrow, resulting in the
+        sharp, discrete peaks characteristic of an infinite periodic array.
+      </p>
+
+      <h5>The 1D Integration</h5>
+      <p>
+        The Radial Integration (below) converts these 2D patterns into a 1D plot. The peaks
+        here give you a precise way to measure the average particle size or lattice spacing.
+        Peaks further towards the left represent larger features than peaks towards the
+        right hand side.
       </p>
     </section>
   </div>
