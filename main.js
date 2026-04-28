@@ -19,6 +19,8 @@ initGenerators(SIZE, SIZE)
 let isReady = false
 let lastDrawnImage = null
 
+const darkQuery = window.matchMedia('(prefers-color-scheme: dark)')
+
 const SOURCES = {
   CAMERA: 'camera',
   GENERATOR: 'generator',
@@ -154,8 +156,34 @@ const settings = {
       gpu.setMagnitudeScale(v)
       markDirty()
     }
+  },
+
+  lightDark:  {
+    el: document.getElementById('theme-switcher'),
+    storageKey: 'theme',
+    default: 'auto',
+    onchange: (v, e) => {
+      const isLight = v === 'auto' ? !darkQuery.matches : v === 'light'
+      document.body.classList.toggle('light-mode', isLight)
+      if (!e) {
+        return
+      }
+      if (!e.target.matches(':focus-visible')) {
+        e.target.blur()
+      }
+    },
+    setElValue: (v) => {
+      const input = settings.lightDark.el.querySelector(`input[value="${v}"]`)
+      if (input) {
+        input.checked = true
+      }
+    }
   }
 }
+
+darkQuery.addEventListener('change', (e) => {
+  settings.lightDark.onchange(settings.lightDark.value)
+})
 
 const elements = {
   // Canvases
@@ -348,23 +376,25 @@ async function initSettings () {
       cfg.refreshElValue = () => {
         const uiVal = cfg.toUI ? cfg.toUI(cfg.value) : cfg.value
 
-        if (isCheckbox) {
+        if (cfg.setElValue) {
+          cfg.setElValue(uiVal)
+        }
+        else if (isCheckbox) {
           cfg.el.checked = uiVal
         } else {
           cfg.el.value = uiVal
         }
       }
 
-
       cfg.refreshElValue()
-      cfg.el.addEventListener(isCheckbox ? 'click' : 'change', () => {
-        const raw = isCheckbox ? cfg.el.checked : cfg.el.value
+      cfg.el.addEventListener(isCheckbox ? 'click' : 'change', (e) => {
+        const raw = isCheckbox ? e.target.checked : e.target.value
         const final = cfg.fromUI ? cfg.fromUI(raw) : raw
 
         cfg.store(final)
 
         if (cfg.onchange) {
-          cfg.onchange(final)
+          cfg.onchange(final, e)
         }
       })
     }
