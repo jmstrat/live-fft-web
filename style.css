@@ -81,15 +81,19 @@ body {
   z-index: 2;
 }
 
+.btn-wrapper {
+  display: inline-block;
+  margin-bottom: 0.6rem;
+}
+
 .btn {
   width: 3rem;
   height: 3rem;
   padding: 0.6rem;
-  margin-bottom: 0.6rem;
   background: var(--accent-color);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 12px;
   cursor: pointer;
   font-weight: 600;
   font-size: 1.5em;
@@ -110,11 +114,11 @@ body {
   filter: brightness(0.95);
 }
 
-#settingsBtn {
+#settings-btn {
   anchor-name: --anchor-settings;
 }
 
-#helpBtn {
+#help-btn {
   anchor-name: --anchor-help;
 }
 
@@ -131,7 +135,7 @@ body {
 
   top: anchor(bottom);
   right: anchor(right);
-  margin-top: 0.5rem;
+  margin-top: 0.6rem;
 }
 
 #settingsMenu {

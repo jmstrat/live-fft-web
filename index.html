@@ -46,27 +46,33 @@
   </main>
 
   <div class="buttons-container">
-    <button id="settingsBtn" class="btn" popovertarget="settingsMenu" aria-label="Settings" title="Settings">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-        aria-hidden="true">
-        <line x1="3" y1="12" x2="21" y2="12"></line>
-        <line x1="3" y1="6" x2="21" y2="6"></line>
-        <line x1="3" y1="18" x2="21" y2="18"></line>
-      </svg>
-    </button>
+    <div id="settings-btn" class="btn-wrapper">
+      <button class="btn" popovertarget="settingsMenu" aria-label="Settings" title="Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          aria-hidden="true">
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+    </div>
 
-    <button id="helpBtn" class="btn" popovertarget="helpPopover" aria-label="Help" title="Help">
-      <span aria-hidden="true">?</span>
-    </button>
+    <div id="help-btn" class="btn-wrapper">
+      <button class="btn" popovertarget="helpPopover" aria-label="Help" title="Help">
+        <span aria-hidden="true">?</span>
+      </button>
+    </div>
 
-    <button id="fullscreen-btn" class="btn" aria-label="Fullscreen" title="Fullscreen">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-        aria-hidden="true">
-        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
-      </svg>
-    </button>
+    <div id="fullscreen-btn" class="btn-wrapper">
+      <button class="btn" aria-label="Fullscreen" title="Fullscreen">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+          aria-hidden="true">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+        </svg>
+      </button>
+    </div>
   </div>
 
   <div id="settingsMenu" class="popup" popover role="dialog" aria-labelledby="settingsTitle">
