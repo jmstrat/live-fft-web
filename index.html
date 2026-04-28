@@ -6,8 +6,20 @@
   <meta name="description"
   content="A live 2D FFT as an educational tool for understanding diffraction"/>
   <meta name='copyright' content='J Stratford'>
+  <meta property="og:title" content="Live Fourier Transform">
+  <meta property="og:description" content="A live 2D FFT educational tool.">
+  <meta property="og:type" content="website">
+
   <title>Live Fourier Transform</title>
+
   <link rel="stylesheet" href="style.css">
+
+  <link rel="modulepreload" href="main.js">
+  <link rel="modulepreload" href="gpu.js">
+  <link rel="modulepreload" href="camera.js">
+  <link rel="modulepreload" href="generators.js">
+  <link rel="modulepreload" href="image-cache.js">
+  <link rel="modulepreload" href="render-loop.js">
 </head>
 
 <body>
@@ -192,14 +204,14 @@
     </div>
   </div>
 
-  <div id="drop" class="overlay hidden">
+  <div id="drop" class="overlay hidden" aria-live="polite" role="status">
     <div class="card message">
       <h2>Drop the image<span class="plural">s</span>!</h2>
     </div>
   </div>
 
   <footer>
-    <p>J Stratford 2026 | <a href="https://github.com/jmstrat/live-fft-web">Source</a></p>
+    <p>J Stratford <time datetime="2026">2026</time> | <a href="https://github.com/jmstrat/live-fft-web">Source</a></p>
   </footer>
 
   <script type="module" src="main.js"></script>

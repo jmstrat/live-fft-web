@@ -214,28 +214,30 @@ export class FFTWebGPU {
   }
 
   async compileShaders () {
-    const convert = await (await fetch('Shaders/convert.wgsl')).text()
-    const boundaryImage = await (await fetch('Shaders/boundary-image.wgsl')).text()
-    const poisson = await (await fetch('Shaders/poisson.wgsl')).text()
-    const decompose = await (await fetch('Shaders/decompose.wgsl')).text()
-    const fft = await (await fetch('Shaders/fft-stockham.wgsl')).text()
-    const magnitude = await (await fetch('Shaders/magnitude.wgsl')).text()
-    const integration = await (await fetch('Shaders/integrate.wgsl')).text()
-    const renderFT = await (await fetch('Shaders/render-ft.wgsl')).text()
-    const renderPlot = await (await fetch('Shaders/render-plot.wgsl')).text()
+    const shaderMap = {
+      convert: 'convert.wgsl',
+      boundaryImage: 'boundary-image.wgsl',
+      poisson: 'poisson.wgsl',
+      decompose: 'decompose.wgsl',
+      fft: 'fft-stockham.wgsl',
+      magnitude: 'magnitude.wgsl',
+      integration: 'integrate.wgsl',
 
-    this.shaders = {
-      convert: this.device.createShaderModule({ code: convert }),
-      boundaryImage: this.device.createShaderModule({ code: boundaryImage }),
-      poisson: this.device.createShaderModule({ code: poisson }),
-      decompose: this.device.createShaderModule({ code: decompose }),
-      fft: this.device.createShaderModule({ code: fft }),
-      magnitude: this.device.createShaderModule({ code: magnitude }),
-      integration: this.device.createShaderModule({ code: integration }),
-
-      render: this.device.createShaderModule({ code: renderFT }),
-      plot: this.device.createShaderModule({ code: renderPlot })
+      render: 'render-ft.wgsl',
+      plot: 'render-plot.wgsl'
     }
+
+    const modules = await Promise.all(
+      Object.entries(shaderMap).map(
+        async ([key, file]) => {
+          const response = await fetch(`Shaders/${file}`)
+          const code = await response.text()
+          return [key, this.device.createShaderModule({ code })]
+        }
+      )
+    )
+
+    this.shaders = Object.fromEntries(modules)
   }
 
   makePipelines () {
