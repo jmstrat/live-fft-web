@@ -363,13 +363,28 @@ function setupDragAndDrop () {
   window.addEventListener('dragover', e => {
     e.preventDefault()
     if (e.dataTransfer.items) {
-      const isImage = Array.from(e.dataTransfer.items).some(item =>
-        item.kind === 'file' && item.type.startsWith('image/')
-      )
+      let hasImage = false
+      let hasMultipleImages = false
+      for (const item of e.dataTransfer.items) {
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          if (hasImage) {
+            hasMultipleImages = true
+            break
+          } else {
+            hasImage = true
+          }
+        }
+      }
 
-      if (isImage) {
+      if (hasImage) {
         elements.drop.classList.remove('hidden')
         e.dataTransfer.dropEffect = 'copy'
+
+        if (hasMultipleImages) {
+          elements.drop.classList.add('contains-plural')
+        } else {
+          elements.drop.classList.remove('contains-plural')
+        }
       } else {
         e.dataTransfer.dropEffect = 'none'
       }

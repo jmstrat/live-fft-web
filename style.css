@@ -305,6 +305,14 @@ input[type="checkbox"]:focus {
   color: #4444ff;
 }
 
+.plural {
+  display: none;
+}
+
+.contains-plural .plural {
+  display: inline;
+}
+
 footer {
   text-align: center;
   padding: 0;
