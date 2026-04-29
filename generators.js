@@ -345,11 +345,17 @@ export const Generators = {
     margin: 1,
     type: 'hex'
   }),
-  'Big Lattice': new Lattice({
+  'Big Square Lattice': new Lattice({
     spacingFactor: 1 / 32,
     radiusFactor: 1 / 256,
     margin: 0,
     type: 'square'
+  }),
+  'Big Hex Lattice': new Lattice({
+    spacingFactor: 1 / 32,
+    radiusFactor: 1 / 256,
+    margin: 0,
+    type: 'hex'
   })
 }
 
