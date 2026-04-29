@@ -200,10 +200,54 @@ class Liquid extends Generator {
 }
 
 class Lattice extends Generator {
+  #stamp
+
+  get spacing () {
+    return this.width * this.config.spacingFactor
+  }
+
+  get radius () {
+    return this.width * this.config.radiusFactor
+  }
+
+  // Firefox seems to have asymmetric anti-aliasing
+  // This interferes with periodic + smooth decomposition to generate unexpected
+  // artefacts, to avoid this we manually draw a symmetric antialiased circle
+  // and place that circle at each lattice point rather than simply drawing an arc
+  #createSymmetricStamp () {
+    const size = Math.ceil(this.radius * 2) + 2
+    const canvas = new OffscreenCanvas(size, size)
+    const ctx = canvas.getContext('2d')
+    const imgData = ctx.createImageData(size, size)
+    const data = imgData.data
+
+    const centre = (size - 1) / 2
+
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dist = Math.sqrt((x - centre) ** 2 + (y - centre) ** 2)
+
+        // Manual Anti-Aliasing (1-pixel ramp)
+        const alpha = Math.max(0, Math.min(1, this.radius + 0.5 - dist))
+        const i = (y * size + x) * 4
+        data[i] = 255
+        data[i + 1] = 255
+        data[i + 2] = 255
+        data[i + 3] = Math.round(alpha * 255)
+      }
+    }
+    ctx.putImageData(imgData, 0, 0)
+    return canvas
+  }
+
+  init (...args) {
+    super.init(...args)
+    this.#stamp = this.#createSymmetricStamp()
+  }
+
   render () {
-    const { spacingFactor, radiusFactor, type = 'hex', margin } = this.config
-    const spacing = this.width * spacingFactor
-    const radius = this.width * radiusFactor
+    const { type = 'hex', margin } = this.config
+    const spacing = this.spacing
     const isHex = type === 'hex'
     const vSpacing = isHex ? spacing * (Math.sqrt(3) / 2) : spacing
 
@@ -214,13 +258,14 @@ class Lattice extends Generator {
     const ymax = this.height - vSpacing * margin
 
     this.ctx.fillStyle = this.palette.fg
+    const stamp = this.#stamp
+    const halfSize = stamp.width / 2
+
     for (let y = ymin, row = 0; y <= ymax; y += vSpacing, row++) {
       const offset = (row % 2) * (spacing / 2)
 
       for (let x = xmin + offset; x <= xmax; x += spacing) {
-        this.ctx.beginPath()
-        this.ctx.arc(x, y, radius, 0, Math.PI * 2)
-        this.ctx.fill()
+        this.ctx.drawImage(stamp, Math.round(x - halfSize), Math.round(y - halfSize))
       }
     }
   }
@@ -265,7 +310,7 @@ export const Generators = {
 
 export function init (width, height) {
   const sharedCanvas = new OffscreenCanvas(width, height)
-  const ctx = sharedCanvas.getContext('2d', { willReadFrequently: true })
+  const ctx = sharedCanvas.getContext('2d', { willReadFrequently: true, alpha: false })
   Object.values(Generators).forEach(g => g.init(sharedCanvas, ctx))
 }
 
