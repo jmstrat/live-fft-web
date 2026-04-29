@@ -171,6 +171,21 @@ const settings = {
       const palette = isLight ? { fg: 'black', bg: 'white' } : { fg: 'white', bg: 'black' }
       setPalette(palette)
       markDirty()
+
+      // Sync theme-colour (affects background and scrollbars on Safari)
+      const systemMetas = document.querySelectorAll("meta[name='theme-color'][media]")
+      systemMetas.forEach(el => el.remove())
+
+      const styles = getComputedStyle(document.body)
+      const bgColour = styles.getPropertyValue('--bg-colour').trim()
+      let activeMeta = document.querySelector("meta[name='theme-color']:not([media])")
+      if (!activeMeta) {
+        activeMeta = document.createElement('meta')
+        activeMeta.name = "theme-color"
+        document.head.appendChild(activeMeta)
+      }
+      activeMeta.setAttribute("content", bgColour)
+
       if (!e) {
         return
       }
