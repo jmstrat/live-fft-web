@@ -270,8 +270,8 @@ input[type="range"]::-moz-range-thumb {
   background: var(--accent-colour); border: none;
 }
 
-input[type="range"]:focus::-webkit-slider-runnable-track { border-colour: var(--accent-colour); }
-input[type="range"]:focus::-moz-range-track { border-colour: var(--accent-colour); }
+input[type="range"]:focus::-webkit-slider-runnable-track { border-color: var(--accent-colour); }
+input[type="range"]:focus::-moz-range-track { border-color: var(--accent-colour); }
 
 input[type="checkbox"] {
   -webkit-appearance: none;
@@ -287,7 +287,7 @@ input[type="checkbox"] {
   display: grid;
   place-content: center;
   cursor: pointer;
-  transition: border-colour 0.15s ease-in-out;
+  transition: border-color 0.15s ease-in-out;
 }
 
 input[type="checkbox"]::before {
@@ -307,7 +307,7 @@ input[type="checkbox"]:checked::before {
 
 input[type="checkbox"]:focus {
   outline: none;
-  border-colour: var(--accent-colour);
+  border-color: var(--accent-colour);
 }
 
 .overlay {
