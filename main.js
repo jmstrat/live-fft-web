@@ -28,14 +28,14 @@ const SOURCES = {
 }
 
 function getActiveGenerator () {
-  return Generators[settings.currentPattern.value]
+  return Generators[settings.currentPattern.value] ?? Generators[Object.keys(Generators)[0]]
 }
 
 function markDirty () {
   const mode = settings.sourceMode.value
 
   if (mode === SOURCES.GENERATOR) {
-    getActiveGenerator().markDirty()
+    getActiveGenerator()?.markDirty?.()
   } else if (mode === SOURCES.IMAGE) {
     lastDrawnImage = null
   }
