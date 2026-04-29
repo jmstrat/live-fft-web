@@ -15,17 +15,19 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
     return;
   }
 
-  let v_hat = textureLoad(v_hat, id.xy).rg;
+  if (id.x == 0u && id.y == 0u) {
+    textureStore(s_hat, id.xy, vec4f(0.0, 0.0, 0.0, 1.0));
+    return;
+  }
 
-  let cos_u = cos(2.0 * PI * f32(id.x) / f32(dims.x));
-  let cos_v = cos(2.0 * PI * f32(id.y) / f32(dims.y));
-  let denom = 2.0 * cos_u + 2.0 * cos_v - 4.0;
+  let sin_u = sin(PI * f32(id.x) / f32(dims.x));
+  let sin_v = sin(PI * f32(id.y) / f32(dims.y));
+  let denom = -4.0 * (sin_u * sin_u + sin_v * sin_v);
 
   var value = vec2f(0.0);
 
-  // DC component (0,0) is zeroed to satisfy mean(s)=0
   if (abs(denom) > 1e-6) {
-    value = v_hat / denom;
+    value = textureLoad(v_hat, id.xy).rg / denom;
   }
 
   textureStore(s_hat, id.xy, vec4f(value, 0.0, 1.0));
