@@ -81,24 +81,26 @@
     </div>
 
     <div id="theme-switcher" class="theme-switcher" role="radiogroup" aria-label="Select colour theme">
-      <label class="btn theme-option">
-        <input type="radio" name="theme" value="light" aria-label="Light Mode">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <label class="btn theme-option" title="Light Mode">
+        <input type="radio" name="theme" value="light">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
           <circle cx="12" cy="12" r="5"/>
-          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          <path d="M12 3v3M12 18v3M5.64 5.64l2.12 2.12M16.24 16.24l2.12 2.12M3 12h3M18 12h3M5.64 18.36l2.12-2.12M16.24 7.76l2.12-2.12"/>
         </svg>
       </label>
 
-      <label class="btn theme-option">
-        <input type="radio" name="theme" value="auto" checked aria-label="System Preference">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="2" y="3" width="20" height="14" rx="2"/>
-          <line x1="12" y1="17" x2="12" y2="21"/>
+      <label class="btn theme-option" title="System Preference">
+        <input type="radio" name="theme" value="auto" checked>
+        <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" viewBox="0 0 24 24">
+          <path d="M8.46447 15.53553C7.54059 14.65017 7 13.38071 7 12c0-2.76142 2.23858-5 5-5 1.38071 0 2.61036.58047 3.53553 1.46447 2.22452 2.1255-5.17106 8.89186-7.07106 7.07106z"/>
+          <path d="M12 3v3M5.64 5.64l2.12 2.12M3 12h3M5.64 18.36l2.12-2.12M16.24 7.76l2.12-2.12"/>
+          <path stroke-width="1" d="M3.88467 20.11617c-2.077-2.077-3.36165-4.94635-3.36165-8.11575 0-6.3388 5.1386-11.4774 11.4774-11.4774 3.1694 0 6.03875 1.28465 8.11576 3.36165z"/>
+          <path fill="currentColor" stroke-width="1" d="M20.11523 3.88477 3.88477 20.11523c2.077 2.077 4.94583 3.36133 8.11523 3.36133 6.3388 0 11.47656-5.13777 11.47656-11.47656 0-3.1694-1.28432-6.03823-3.36133-8.11523zM16 10.88672A4.6997 4.6997 0 1 1 10.88672 16 3.65532 3.65532 0 0 0 16 10.88672z"/>
         </svg>
       </label>
 
-      <label class="btn theme-option">
-        <input type="radio" name="theme" value="dark" aria-label="Dark Mode">
+      <label class="btn theme-option" title="Dark Mode">
+        <input type="radio" name="theme" value="dark">
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
         </svg>
