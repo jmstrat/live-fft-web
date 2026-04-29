@@ -40,6 +40,7 @@ export class FFTWebGPU {
 
   #inputDisplayMode = 'raw'
   #periodicPlusSmooth = false
+  #integrationBackgroundCol = [ 0, 0, 0, 1]
 
   async init (inputCanvas, ftCanvas, integrationCanvas, size) {
     this.size = size
@@ -152,6 +153,12 @@ export class FFTWebGPU {
     this.device.queue.writeBuffer(this.buffers.magnitudeUniforms, 4, arr)
   }
 
+  setIntegrationPalette ({ bg, fg }) {
+    this.#integrationBackgroundCol = bg
+    const arr = new Float32Array(fg)
+    this.device.queue.writeBuffer(this.buffers.plotUniforms, 0, arr)
+  }
+
   makeResources () {
     const createTexture = (
       format,
@@ -208,6 +215,10 @@ export class FFTWebGPU {
       }),
       magnitudeUniforms: this.device.createBuffer({
         size: 8,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+      }),
+      plotUniforms: this.device.createBuffer({
+        size: 16,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
       })
     }
@@ -533,7 +544,8 @@ export class FFTWebGPU {
       layout: this.plotPipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: this.buffers.profile } },
-        { binding: 1, resource: { buffer: this.buffers.global_max } }
+        { binding: 1, resource: { buffer: this.buffers.global_max } },
+        { binding: 2, resource: { buffer: this.buffers.plotUniforms } }
       ]
     })
   }
@@ -756,7 +768,8 @@ export class FFTWebGPU {
         colorAttachments: [{
           view: this.ctxPlot.getCurrentTexture().createView(),
           loadOp: "clear",
-          storeOp: "store"
+          storeOp: "store",
+          clearValue: this.#integrationBackgroundCol
         }]
       })
 

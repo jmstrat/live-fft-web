@@ -1,6 +1,6 @@
 import { FFTWebGPU } from './gpu.js'
 import { Camera } from './camera.js'
-import { Generators, init as initGenerators } from './generators.js'
+import { Generators, init as initGenerators, setPalette } from './generators.js'
 import { ImageCache } from './image-cache.js'
 import { RenderLoop } from './render-loop.js'
 
@@ -165,6 +165,11 @@ const settings = {
     onchange: (v, e) => {
       const isLight = v === 'auto' ? !darkQuery.matches : v === 'light'
       document.body.classList.toggle('light-mode', isLight)
+      const white = [ 1, 1, 1, 1]
+      const black = [ 0, 0, 0, 1]
+      gpu.setIntegrationPalette(isLight ? { fg: black, bg: white } : { fg: white, bg: black })
+      const palette = isLight ? { fg: 'black', bg: 'white' } : { fg: 'white', bg: 'black' }
+      setPalette(palette)
       if (!e) {
         return
       }

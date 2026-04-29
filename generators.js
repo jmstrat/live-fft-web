@@ -51,6 +51,11 @@ class Generator {
     this.#dirty = true
   }
 
+  setPalette (palette) {
+    this.#palette = palette
+    this.markDirty()
+  }
+
   clear () {
     this.ctx.fillStyle = this.palette.bg
     this.ctx.fillRect(0, 0, this.width, this.height)
@@ -262,4 +267,8 @@ export function init (width, height) {
   const sharedCanvas = new OffscreenCanvas(width, height)
   const ctx = sharedCanvas.getContext('2d', { willReadFrequently: true })
   Object.values(Generators).forEach(g => g.init(sharedCanvas, ctx))
+}
+
+export function setPalette (palette) {
+  Object.values(Generators).forEach(g => g.setPalette(palette))
 }

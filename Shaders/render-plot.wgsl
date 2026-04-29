@@ -1,5 +1,10 @@
 @group(0) @binding(0) var<storage, read> profile : array<f32>;
 @group(0) @binding(1) var<storage, read> global_max : u32;
+@group(0) @binding(2) var<uniform> params : Params;
+
+struct Params {
+  col: vec4f
+};
 
 
 const DC_SHIFT = 20.0;
@@ -48,5 +53,5 @@ fn vs_main(@builtin(vertex_index) idx : u32) -> @builtin(position) vec4f {
 
 @fragment
 fn fs_main() -> @location(0) vec4f {
-  return vec4f(1.0);
+  return params.col;
 }
