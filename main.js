@@ -431,7 +431,10 @@ async function initSettings () {
 function setupDragAndDrop () {
   window.addEventListener('dragover', e => {
     e.preventDefault()
-    if (e.dataTransfer.items) {
+    const types = Array.from(e.dataTransfer.types || [])
+    const isFileDrag = types.includes('Files')
+
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
       let hasImage = false
       let hasMultipleImages = false
       for (const item of e.dataTransfer.items) {
@@ -458,6 +461,12 @@ function setupDragAndDrop () {
       } else {
         e.dataTransfer.dropEffect = 'none'
       }
+    } else if (isFileDrag) {
+      // Safari doesn't populate items on dragover
+      elements.drop.classList.remove('hidden')
+      elements.noImages.classList.add('hidden')
+      elements.drop.classList.add('contains-plural')
+      e.dataTransfer.dropEffect = 'copy'
     }
   })
 
