@@ -56,6 +56,13 @@ class Generator {
     this.markDirty()
   }
 
+  resolveColour (col) {
+    const tempCtx = new OffscreenCanvas(1, 1).getContext('2d')
+    tempCtx.fillStyle = col
+    tempCtx.fillRect(0, 0, 1, 1)
+    return tempCtx.getImageData(0, 0, 1, 1).data
+  }
+
   clear () {
     this.ctx.fillStyle = this.palette.bg
     this.ctx.fillRect(0, 0, this.width, this.height)
@@ -206,6 +213,13 @@ class Lattice extends Generator {
     return this.width * this.config.spacingFactor
   }
 
+  get vSpacing () {
+    // In principle this should be multiplied by (Math.sqrt(3) / 2)
+    // if type === 'hex'
+    // but we don't do this to avoid drawing at fractional pixel coords
+    return this.spacing
+  }
+
   get radius () {
     return this.width * this.config.radiusFactor
   }
@@ -214,14 +228,16 @@ class Lattice extends Generator {
   // This interferes with periodic + smooth decomposition to generate unexpected
   // artefacts, to avoid this we manually draw a symmetric antialiased circle
   // and place that circle at each lattice point rather than simply drawing an arc
-  #createSymmetricStamp () {
-    const size = Math.ceil(this.radius * 2) + 2
+  #createSymmetricCircle () {
+    const size = Math.ceil(this.radius * 2)
     const canvas = new OffscreenCanvas(size, size)
     const ctx = canvas.getContext('2d')
     const imgData = ctx.createImageData(size, size)
     const data = imgData.data
 
     const centre = (size - 1) / 2
+
+    const [r, g, b] = this.resolveColour(this.palette.fg)
 
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
@@ -230,9 +246,9 @@ class Lattice extends Generator {
         // Manual Anti-Aliasing (1-pixel ramp)
         const alpha = Math.max(0, Math.min(1, this.radius + 0.5 - dist))
         const i = (y * size + x) * 4
-        data[i] = 255
-        data[i + 1] = 255
-        data[i + 2] = 255
+        data[i] = r
+        data[i + 1] = g
+        data[i + 2] = b
         data[i + 3] = Math.round(alpha * 255)
       }
     }
@@ -240,34 +256,63 @@ class Lattice extends Generator {
     return canvas
   }
 
+  #createSymmetricStamp () {
+    const spacing = this.spacing
+    const vSpacing = this.vSpacing
+
+    const isHex = this.config.type === 'hex'
+
+    // Create a canvas that represents one repeating unit of the lattice
+    const tileWidth = spacing
+    const tileHeight = isHex ? vSpacing * 2 : vSpacing
+    const canvas = new OffscreenCanvas(tileWidth, tileHeight)
+    const ctx = canvas.getContext('2d')
+
+    const stamp = this.#createSymmetricCircle()
+
+    if (isHex) {
+      ctx.drawImage(stamp, 0, 0)
+      ctx.drawImage(stamp, (spacing / 2), vSpacing)
+    } else {
+      ctx.drawImage(stamp, 0, 0)
+    }
+
+    return this.ctx.createPattern(canvas, 'repeat')
+  }
+
   init (...args) {
     super.init(...args)
     this.#stamp = this.#createSymmetricStamp()
   }
 
+  setPalette (...args) {
+    super.setPalette(...args)
+    this.#stamp = this.#createSymmetricStamp()
+  }
+
   render () {
-    const { type = 'hex', margin } = this.config
-    const spacing = this.spacing
-    const isHex = type === 'hex'
-    const vSpacing = isHex ? spacing * (Math.sqrt(3) / 2) : spacing
+    const { margin } = this.config
 
-    const xmin = spacing * margin
-    const xmax = this.width - spacing * margin
+    const r = this.radius
+    const cols = Math.floor(this.width / this.spacing + 1 - margin * 2)
+    const rows = Math.floor(this.height / this.vSpacing + 1 - margin * 2)
 
-    const ymin = spacing * margin
-    const ymax = this.height - vSpacing * margin
+    const gridW = Math.ceil((cols - 1) * this.spacing)
+    const gridH = Math.ceil((rows - 1) * this.vSpacing)
 
-    this.ctx.fillStyle = this.palette.fg
+    const xMargin = (this.width - gridW) / 2
+    const yMargin = (this.height - gridH) / 2
+
+    const w = gridW + r * 2
+    const h = gridH + r * 2
+
     const stamp = this.#stamp
-    const halfSize = stamp.width / 2
 
-    for (let y = ymin, row = 0; y <= ymax; y += vSpacing, row++) {
-      const offset = (row % 2) * (spacing / 2)
-
-      for (let x = xmin + offset; x <= xmax; x += spacing) {
-        this.ctx.drawImage(stamp, Math.round(x - halfSize), Math.round(y - halfSize))
-      }
-    }
+    this.ctx.save()
+    this.ctx.translate(xMargin - r, yMargin - r)
+    this.ctx.fillStyle = stamp
+    this.ctx.fillRect(0, 0, w, h)
+    this.ctx.restore()
   }
 }
 
