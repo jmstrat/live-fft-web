@@ -165,11 +165,12 @@ const settings = {
     onchange: (v, e) => {
       const isLight = v === 'auto' ? !darkQuery.matches : v === 'light'
       document.body.classList.toggle('light-mode', isLight)
-      const white = [ 1, 1, 1, 1]
-      const black = [ 0, 0, 0, 1]
+      const white = [ 1, 1, 1, 1 ]
+      const black = [ 0, 0, 0, 1 ]
       gpu.setIntegrationPalette(isLight ? { fg: black, bg: white } : { fg: white, bg: black })
       const palette = isLight ? { fg: 'black', bg: 'white' } : { fg: 'white', bg: 'black' }
       setPalette(palette)
+      markDirty()
       if (!e) {
         return
       }
