@@ -1,7 +1,9 @@
 // This file provides the procedurally generated "Example Images"
 
 const oscillators = {
-  sin: () => Math.sin(Date.now() * 0.0005)
+  sin: () => Math.sin(Date.now() * 0.0005),
+  normSin: () => Math.sin(Date.now() * 0.0005) * 0.5 + 0.5,
+  normSaw: () => (Date.now() * 0.0005 / Math.PI) % 1
 }
 
 const DEFAULT_PALETTE = {
@@ -206,19 +208,8 @@ class Liquid extends Generator {
   }
 }
 
-class Lattice extends Generator {
-  #stamp
-
-  get spacing () {
-    return this.width * this.config.spacingFactor
-  }
-
-  get vSpacing () {
-    // In principle this should be multiplied by (Math.sqrt(3) / 2)
-    // if type === 'hex'
-    // but we don't do this to avoid drawing at fractional pixel coords
-    return this.spacing
-  }
+class Circles extends Generator {
+  stamp
 
   get radius () {
     return this.width * this.config.radiusFactor
@@ -228,7 +219,7 @@ class Lattice extends Generator {
   // This interferes with periodic + smooth decomposition to generate unexpected
   // artefacts, to avoid this we manually draw a symmetric antialiased circle
   // and place that circle at each lattice point rather than simply drawing an arc
-  #createSymmetricCircle () {
+  createSymmetricCircle () {
     const size = Math.ceil(this.radius * 2)
     const canvas = new OffscreenCanvas(size, size)
     const ctx = canvas.getContext('2d')
@@ -256,6 +247,75 @@ class Lattice extends Generator {
     return canvas
   }
 
+  init (...args) {
+    super.init(...args)
+    this.stamp = this.createSymmetricCircle()
+  }
+
+  setPalette (...args) {
+    super.setPalette(...args)
+    this.stamp = this.createSymmetricCircle()
+  }
+
+  render () {
+    const y = Math.round(this.height / 2  - this.radius / 2)
+    const x = this.width / 2 - this.radius / 2
+
+    const minGap = this.config.minGapFactor * this.width + this.radius * 2
+    const maxGap = this.config.maxGapFactor * this.width
+    const gap = minGap + (maxGap - minGap) * this.getDelta()
+
+    const stamp = this.stamp
+
+    const n = this.config.n
+
+    const totalWidth = (n - 1) * gap
+    const startX = x - totalWidth / 2
+
+    for (let i = 0; i < n; i++) {
+      const posX = startX + (i * gap)
+      this.ctx.drawImage(stamp, posX, y)
+    }
+
+    this.markDirty()
+  }
+}
+
+class MovingCircle extends Circles {
+  render () {
+    let y = this.height / 2 - this.radius / 2
+    let x = this.width / 2 - this.radius / 2
+    const stamp = this.stamp
+
+    const t = this.getDelta()
+
+    const orbitRadius = this.config.orbitFactor * this.width
+    const angle = t * Math.PI * 2
+
+    x += Math.cos(angle) * orbitRadius
+    y += Math.sin(angle) * orbitRadius
+
+
+    this.ctx.drawImage(stamp, Math.round(x), Math.round(y))
+
+    this.markDirty()
+  }
+}
+
+class Lattice extends Circles {
+  #stamp
+
+  get spacing () {
+    return this.width * this.config.spacingFactor
+  }
+
+  get vSpacing () {
+    // In principle this should be multiplied by (Math.sqrt(3) / 2)
+    // if type === 'hex'
+    // but we don't do this to avoid drawing at fractional pixel coords
+    return this.spacing
+  }
+
   #createSymmetricStamp () {
     const spacing = this.spacing
     const vSpacing = this.vSpacing
@@ -268,7 +328,7 @@ class Lattice extends Generator {
     const canvas = new OffscreenCanvas(tileWidth, tileHeight)
     const ctx = canvas.getContext('2d')
 
-    const stamp = this.#createSymmetricCircle()
+    const stamp = this.createSymmetricCircle()
 
     if (isHex) {
       ctx.drawImage(stamp, 0, 0)
@@ -338,6 +398,18 @@ export const Generators = {
     eccentricity: { min: 1.5, max: 3.5 },
     angleVariance: 0.02,
     emptyFactor: 5
+  }),
+  Orbit: new MovingCircle({
+    radiusFactor: 1 / 32,
+    orbitFactor: 1 / 4,
+    oscillator: 'normSaw'
+  }),
+  'Two Circles': new Circles({
+    n: 2,
+    radiusFactor: 1 / 64,
+    minGapFactor: 1 / 256,
+    maxGapFactor: 1 / 4,
+    oscillator: 'normSin'
   }),
   'Lattice': new Lattice({
     spacingFactor: 1 / 16,
