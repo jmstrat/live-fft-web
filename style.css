@@ -30,7 +30,8 @@ body {
   margin: 0;
   background: var(--bg-colour);
   color: var(--text-colour);
-  font-family: sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
 }
 
 .dashboard {
@@ -189,14 +190,14 @@ body {
   scrollbar-color: rgba(155, 155, 155, 0.4) transparent;
 }
 
-
 #settings-popup {
   position-anchor: --anchor-settings;
 }
 
 #help-popup {
   position-anchor: --anchor-help;
-  width: 500px;
+  width: 600px;
+  line-height: 1.5em;
 }
 
 .popup section {
@@ -220,6 +221,7 @@ select {
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
+  font-family: inherit;
 
   background-image:
     linear-gradient(45deg, transparent 50%, var(--text-colour) 50%),
