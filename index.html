@@ -33,19 +33,19 @@
 <body>
   <main class="dashboard">
     <div class="row">
-      <canvas id="input-canvas" class="square output"
+      <canvas id="input-canvas" class="output left"
         title="Input image to be Fourier transformed"
         aria-label="Input image to be Fourier transformed" role="img">
         <p>Live visualization of the input signal before Fourier transformation.</p>
       </canvas>
-      <canvas id="fft-canvas" class="square output"
+      <canvas id="fft-canvas" class="output right"
         title="Fourier transformed image"
         aria-label="Fourier transformed image" role="img">
           <p>Live visualization of the input signal after Fourier transformation.</p>
       </canvas>
     </div>
     <div class="row">
-      <canvas id="integration-canvas" class="output fw"
+      <canvas id="integration-canvas" class="output fw top"
         title="Radial integration of the Fourier transformed image"
         aria-label="Radial integration of the Fourier transformed image" role="img">
           <p>Live radial integration of the Fourier transformed signal.</p>
