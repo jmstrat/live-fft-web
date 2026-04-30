@@ -1,6 +1,7 @@
 // This file provides the procedurally generated "Example Images"
 
 const oscillators = {
+  linear: () => Math.abs(((Date.now() * 0.0005 / Math.PI) % 2) - 1),
   sin: () => Math.sin(Date.now() * 0.0005),
   normSin: () => Math.sin(Date.now() * 0.0005) * 0.5 + 0.5,
   normSaw: () => (Date.now() * 0.0005 / Math.PI) % 1
@@ -262,7 +263,7 @@ class Circles extends Generator {
     const x = this.width / 2 - this.radius
 
     const minGap = this.config.minGapFactor * this.width + this.radius * 2
-    const maxGap = this.config.maxGapFactor * this.width
+    const maxGap = this.config.maxGapFactor * this.width + this.radius * 2
     const gap = minGap + (maxGap - minGap) * this.getDelta()
 
     const stamp = this.stamp
@@ -274,7 +275,7 @@ class Circles extends Generator {
 
     for (let i = 0; i < n; i++) {
       const posX = startX + (i * gap)
-      this.ctx.drawImage(stamp, posX, y)
+      this.ctx.drawImage(stamp, Math.round(posX), y)
     }
 
     this.markDirty()
@@ -406,10 +407,10 @@ export const Generators = {
   }),
   'Two Circles': new Circles({
     n: 2,
-    radiusFactor: 1 / 64,
-    minGapFactor: 1 / 256,
-    maxGapFactor: 1 / 4,
-    oscillator: 'normSin'
+    radiusFactor: 1 / 128,
+    minGapFactor: 0,
+    maxGapFactor: 1 / 8,
+    oscillator: 'linear'
   }),
   'Lattice': new Lattice({
     spacingFactor: 1 / 16,
