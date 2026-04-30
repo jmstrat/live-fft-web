@@ -2,9 +2,13 @@
 @group(0) @binding(1) var src_external: texture_external;
 
 @group(0) @binding(2) var dst: texture_storage_2d<rg32float, write>;
-@group(0) @binding(3) var<uniform> params : Params;
+@group(0) @binding(3) var dst_rgba: texture_storage_2d<rgba8unorm, write>;
+
+@group(0) @binding(4) var<uniform> params : Params;
 
 const PI: f32 = 3.14159265359;
+
+override STORE_RGBA_COPY: bool = false;
 
 struct Params {
   window_type: u32,
@@ -65,6 +69,10 @@ fn processPixel(colour: vec4f, coords: vec2u, dims: vec2u) {
   }
 
   textureStore(dst, out_coords, value);
+
+  if (STORE_RGBA_COPY) {
+    textureStore(dst_rgba, out_coords, value);
+  }
 }
 
 @compute @workgroup_size(8, 8)

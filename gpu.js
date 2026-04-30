@@ -75,6 +75,7 @@ export class FFTWebGPU {
       requiredFeatures.push("float32-filterable")
       this.canRenderFloat32 = true
     } else {
+      console.warn('GPU cannot render float 32 textures')
       this.canRenderFloat32 = false
     }
 
@@ -128,16 +129,7 @@ export class FFTWebGPU {
   }
 
   setInputTextureDisplayMode (mode) {
-    if (mode === FFTWebGPU.InputDisplayMode.processed) {
-      if (!this.canRenderFloat32) {
-        console.error('Cannot render processed input due to lack of GPU hardware support')
-        this.#inputDisplayMode = FFTWebGPU.InputDisplayMode.raw
-      } else {
-        this.#inputDisplayMode = FFTWebGPU.InputDisplayMode.processed
-      }
-    } else {
-      this.#inputDisplayMode = FFTWebGPU.InputDisplayMode.raw
-    }
+    this.#inputDisplayMode = mode
   }
 
   setFlipX (bool) {
@@ -285,7 +277,10 @@ export class FFTWebGPU {
       layout: 'auto',
       compute: {
         module: this.shaders.convert,
-        entryPoint: 'main'
+        entryPoint: 'main',
+        constants: {
+          STORE_RGBA_COPY: !this.canRenderFloat32
+        }
       }
     })
 
@@ -293,16 +288,23 @@ export class FFTWebGPU {
       layout: 'auto',
       compute: {
         module: this.shaders.convert,
-        entryPoint: 'main_external'
+        entryPoint: 'main_external',
+        constants: {
+          STORE_RGBA_COPY: !this.canRenderFloat32
+        }
       }
     })
+
+    // Note that view.outputPhase is only used if !this.canRenderFloat32
+    // See the note about the render pipeline below
 
     this.convertBindGroup = this.device.createBindGroup({
       layout: this.convertPipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: this.views.input },
         { binding: 2, resource: this.views.fft[0] },
-        { binding: 3, resource: { buffer: this.buffers.convertUniforms } }
+        { binding: 3, resource: this.views.outputPhase },
+        { binding: 4, resource: { buffer: this.buffers.convertUniforms } }
       ]
     })
 
@@ -313,7 +315,8 @@ export class FFTWebGPU {
         entries: [
           { binding: 1, resource: externalTexture },
           { binding: 2, resource: this.views.fft[0] },
-          { binding: 3, resource: { buffer: this.buffers.convertUniforms } }
+          { binding: 3, resource: this.views.outputPhase },
+          { binding: 4, resource: { buffer: this.buffers.convertUniforms } }
         ]
       })
     }
@@ -526,9 +529,20 @@ export class FFTWebGPU {
 
     this.renderPipelines = {
       [FFTWebGPU.InputDisplayMode.raw]: makeRenderPipeline({ GREYSCALE: false }, this.views.input),
-      [FFTWebGPU.InputDisplayMode.processed]: makeRenderPipeline({ GREYSCALE: true }, this.views.fft[0]),
       outputMagnitude: makeRenderPipeline({ GREYSCALE: false }, this.views.outputMagnitude),
       outputPhase: makeRenderPipeline({ GREYSCALE: false }, this.views.outputPhase)
+    }
+
+    if (this.canRenderFloat32) {
+      this.renderPipelines[FFTWebGPU.InputDisplayMode.processed] =
+        makeRenderPipeline({ GREYSCALE: true }, this.views.fft[0])
+    } else {
+      // If we can't render the processed texture directly, we temporarily copy
+      // it to a renderable texture. Rather than use another texture we can
+      // use one of the output textures which are not used at this point in the
+      // render workflow. Note also the changes to the convert pipeline
+      this.renderPipelines[FFTWebGPU.InputDisplayMode.processed] =
+        makeRenderPipeline({ GREYSCALE: true }, this.views.outputPhase)
     }
 
     this.renderExternalPipeline = this.device.createRenderPipeline({
