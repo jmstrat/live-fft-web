@@ -137,12 +137,39 @@ const settings = {
   },
 
   // Output
-  colourMap: {
-    el: document.getElementById('colourmap-select'),
-    storageKey: 'colour-map',
-    default: 'None',
+  displayPhase: {
+    el: document.getElementById('phase-checkbox'),
+    storageKey: 'display-phase',
+    default: false,
     onchange: (v) => {
-      gpu.setColourMap(FFTWebGPU.ColourMap[v])
+      if (v) {
+        elements.dashboard.classList.add('col-3')
+        elements.phase.classList.remove('hidden')
+        gpu.setRenderPhase(true)
+      } else {
+        elements.dashboard.classList.remove('col-3')
+        elements.phase.classList.add('hidden')
+        gpu.setRenderPhase(false)
+      }
+
+      markDirty()
+    }
+  },
+  magnitudeColourMap: {
+    el: document.getElementById('magnitude-colourmap-select'),
+    storageKey: 'mag-colour-map',
+    default: 'Viridis',
+    onchange: (v) => {
+      gpu.setMagnitudeColourMap(FFTWebGPU.MagnitudeColourMap[v])
+      markDirty()
+    }
+  },
+  phaseColourMap: {
+    el: document.getElementById('phase-colourmap-select'),
+    storageKey: 'phase-colour-map',
+    default: 'Roma',
+    onchange: (v) => {
+      gpu.setPhaseColourMap(FFTWebGPU.PhaseColourMap[v])
       markDirty()
     }
   },
@@ -207,9 +234,11 @@ darkQuery.addEventListener('change', (e) => {
 })
 
 const elements = {
+  dashboard: document.getElementById('dashboard'),
   // Canvases
   input: document.getElementById('input-canvas'),
-  output: document.getElementById('fft-canvas'),
+  magnitude: document.getElementById('fft-magnitude'),
+  phase: document.getElementById('fft-phase'),
   integration: document.getElementById('integration-canvas'),
 
   // Input sections
@@ -292,12 +321,13 @@ async function render () {
 
 async function init () {
   elements.input.width = elements.input.height = SIZE
-  elements.output.width = elements.output.height = SIZE
+  elements.magnitude.width = elements.magnitude.height = SIZE
+  elements.phase.width = elements.phase.height = SIZE
   elements.integration.width = SIZE * 2
   elements.integration.height = SIZE / 2
 
   try {
-    await gpu.init(elements.input, elements.output, elements.integration, SIZE)
+    await gpu.init(elements.input, elements.magnitude, elements.phase, elements.integration, SIZE)
     await initSettings()
 
     renderPatternOptions()

@@ -1,20 +1,35 @@
 @group(0) @binding(0) var src : texture_storage_2d<rg32float, read>;
 @group(0) @binding(1) var dst : texture_storage_2d<rg32float, write>;
-@group(0) @binding(2) var rgba : texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(2) var magnitude_rgba : texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(3) var phase_rgba : texture_storage_2d<rgba8unorm, write>;
 
-@group(0) @binding(3) var<uniform> params : Params;
+@group(0) @binding(4) var<uniform> params : Params;
 
-// Colour mapping
-// 0=Greyscale
-// 1=Viridis
-// 2=Plasma
-// 3=Magma
-// 4=Inferno
-// 5=Cividis
+// Colour mapping (magnitude)
+// 0 = Greyscale
+// 1 = Viridis
+// 2 = Plasma
+// 3 = Magma
+// 4 = Inferno
+// 5 = Cividis
+
+// Colour mapping (phase)
+// 0 = Greyscale
+// 1 = Twilight
+// 2 = Colorcet Phase 4
+// 3 = Roma
+// 4 = Rainbow
+
 struct Params {
-  palette_index: u32,
-  magnitude_scale: f32
+  magnitude_palette_index: u32,
+  magnitude_scale: f32,
+  calc_phase: u32,
+  phase_palette_index: u32,
 };
+
+const PI: f32 = acos(-1.0);
+
+// ---- Non Cyclic Colour Mapping ----
 
 const VIRIDIS: array<vec3f, 7> = array<vec3f, 7>(
   vec3f(0.2777, 0.0054, 0.3341), vec3f(0.1051, 1.4046, 1.3846), vec3f(-0.3309, 0.2148, 0.0951),
@@ -46,12 +61,12 @@ const CIVIDIS: array<vec3f, 7> = array<vec3f, 7>(
   vec3f(2.5574, -0.2227, -0.4285), vec3f(-0.5841, 0.0543, 0.0827)
 );
 
-fn get_color(t: f32) -> vec4f {
+fn get_mag_colour(t: f32) -> vec4f {
   let x = clamp(t, 0.0, 1.0);
   var coeffs: array<vec3f, 7>;
 
   // Select palette
-  switch (params.palette_index) {
+  switch (params.magnitude_palette_index) {
     case 1u: { coeffs = VIRIDIS; }
     case 2u: { coeffs = PLASMA; }
     case 3u: { coeffs = MAGMA; }
@@ -73,8 +88,71 @@ fn get_color(t: f32) -> vec4f {
   return vec4f(clamp(rgb, vec3f(0.0), vec3f(1.0)), 1.0);
 }
 
+// ---- Cyclic colour mapping ----
+
+// Cyclic Palette Coefficients (0°, 90°, 180°, 270°)
+const TWILIGHT: array<vec3f, 4> = array<vec3f, 4>(
+  vec3f(0.886, 0.855, 0.886),
+  vec3f(0.361, 0.384, 0.898),
+  vec3f(0.200, 0.149, 0.149),
+  vec3f(0.910, 0.812, 0.710)
+);
+
+const COLORCET_C2: array<vec3f, 4>  = array<vec3f, 4>(
+  vec3f(0.949, 0.949, 0.949),
+  vec3f(0.333, 0.733, 1.000),
+  vec3f(1.000, 0.867, 0.333),
+  vec3f(0.949, 0.949, 0.949)
+);
+
+const CRAMERI_ROMA: array<vec3f, 4> = array<vec3f, 4>(
+  vec3f(0.494, 0.188, 0.451),
+  vec3f(0.239, 0.322, 0.533),
+  vec3f(0.255, 0.549, 0.380),
+  vec3f(0.745, 0.553, 0.259)
+);
+
+fn eval_palette(t: f32, p: array<vec3f, 4>) -> vec4f {
+    let scaled_t = t * 4.0;
+    let idx = u32(floor(scaled_t)) % 4u;
+    let next_idx = (idx + 1u) % 4u;
+    let f = fract(scaled_t);
+    let rgb = mix(p[idx], p[next_idx], f);
+    return vec4f(rgb, 1.0);
+}
+
+fn hsv2rgb(h: f32) -> vec4f {
+  let s = 0.8; let v = 0.9;
+  let c = v * s;
+  let x = c * (1.0 - abs((h * 6.0) % 2.0 - 1.0));
+  let m = v - c;
+  var rgb: vec3f;
+  if (h < 1.0/6.0) { rgb = vec3f(c, x, 0.0); }
+  else if (h < 2.0/6.0) { rgb = vec3f(x, c, 0.0); }
+  else if (h < 3.0/6.0) { rgb = vec3f(0.0, c, x); }
+  else if (h < 4.0/6.0) { rgb = vec3f(0.0, x, c); }
+  else if (h < 5.0/6.0) { rgb = vec3f(x, 0.0, c); }
+  else { rgb = vec3f(c, 0.0, x); }
+  return vec4f(rgb + m, 1.0);
+}
+
+fn get_phase_colour(t: f32) -> vec4f {
+  let val = fract(t);
+
+  switch params.phase_palette_index {
+    case 1u: { return eval_palette(val, TWILIGHT); }
+    case 2u: { return eval_palette(val, COLORCET_C2); }
+    case 3u: { return eval_palette(val, CRAMERI_ROMA); }
+    case 4u: { return hsv2rgb(val); }
+    default: {
+      let g = 0.5 - 0.5 * cos(2 * PI * val);
+      return vec4f(g, g, g, 1.0);
+    }
+  }
+}
+
 @compute @workgroup_size(8, 8)
-fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+fn main(@builtin(global_invocation_id) gid : vec3u) {
   let dims = textureDimensions(src);
   let coords = gid.xy;
 
@@ -86,18 +164,26 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
   let shifted = (coords + dims / 2u) % dims;
   let complex_val = textureLoad(src, shifted).rg;
 
-  let intensity = length(complex_val);
-  let magnitude_log = log(1.0 + intensity) / log(10.0);
-
   let centre = vec2f(dims) / 2.0;
   let dist = distance(vec2f(coords), centre);
 
+  // ---- Magnitude ----
   // dst is used for the integration step
+  let intensity = length(complex_val);
+  let magnitude_log = log(1.0 + intensity) / log(10.0);
   textureStore(dst, coords, vec4f(magnitude_log, dist, 0.0, 0.0));
 
-  // Normalise the log values to 0.0 - 1.0
-  let normalized_val = clamp(magnitude_log * params.magnitude_scale, 0.0, 1.0);
-
   // rgba is directly rendered (with an optional colour map)
-  textureStore(rgba, coords, get_color(normalized_val));
+  let normalized_val = clamp(magnitude_log * params.magnitude_scale, 0.0, 1.0);
+  textureStore(magnitude_rgba, coords, get_mag_colour(normalized_val));
+
+  if (params.calc_phase != 1u) {
+    return;
+  }
+
+  // ---- Phase ----
+  // This is only for rendering, we do not integrate the phase
+  let phase_val = atan2(complex_val.g, complex_val.r);
+  let normalized_phase = (phase_val / PI) * 0.5 + 0.5;
+  textureStore(phase_rgba, coords, get_phase_colour(normalized_phase));
 }

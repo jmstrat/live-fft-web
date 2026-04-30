@@ -29,7 +29,7 @@ export class FFTWebGPU {
     PeriodicPlusSmooth: 99
   }
 
-  static ColourMap = {
+  static MagnitudeColourMap = {
     None: 0,
     Viridis: 1,
     Plasma: 2,
@@ -38,11 +38,20 @@ export class FFTWebGPU {
     Cividis: 5
   }
 
+  static PhaseColourMap = {
+    None: 0,
+    Twilight: 1,
+    'Colorcet Phase 4': 2,
+    Roma: 3,
+    Rainbow: 4
+  }
+
   #inputDisplayMode = 'raw'
   #periodicPlusSmooth = false
   #integrationBackgroundCol = [ 0, 0, 0, 1]
+  #renderPhase = false
 
-  async init (inputCanvas, ftCanvas, integrationCanvas, size) {
+  async init (inputCanvas, magnitudeCanvas, phaseCanvas, integrationCanvas, size) {
     this.size = size
     // This is just for the integration, we don't include the corners
     this.maxR = (size / 2) - 1
@@ -88,8 +97,11 @@ export class FFTWebGPU {
     this.ctxInput = inputCanvas.getContext('webgpu')
     this.ctxInput.configure({ device: this.device, format: this.format })
 
-    this.ctxFFT = ftCanvas.getContext('webgpu')
-    this.ctxFFT.configure({ device: this.device, format: this.format })
+    this.ctxMagnitude = magnitudeCanvas.getContext('webgpu')
+    this.ctxMagnitude.configure({ device: this.device, format: this.format })
+
+    this.ctxPhase = phaseCanvas.getContext('webgpu')
+    this.ctxPhase.configure({ device: this.device, format: this.format })
 
     this.ctxPlot = integrationCanvas.getContext('webgpu')
     this.ctxPlot.configure({ device: this.device, format: this.format })
@@ -133,13 +145,28 @@ export class FFTWebGPU {
     this.device.queue.writeBuffer(this.buffers.convertUniforms, 4, arr)
   }
 
-  setColourMap (idx) {
+  setRenderPhase (bool) {
+    this.#renderPhase = bool
+    const arr = new Uint32Array([ bool ? 1 : 0 ])
+    this.device.queue.writeBuffer(this.buffers.magnitudeUniforms, 8, arr)
+  }
+
+  setMagnitudeColourMap (idx) {
     if (isNaN(idx) || idx < 0 || idx > 5) {
       idx = 0
     }
 
     const arr = new Uint32Array([idx])
     this.device.queue.writeBuffer(this.buffers.magnitudeUniforms, 0, arr)
+  }
+
+  setPhaseColourMap (idx) {
+    if (isNaN(idx) || idx < 0 || idx > 4) {
+      idx = 0
+    }
+
+    const arr = new Uint32Array([idx])
+    this.device.queue.writeBuffer(this.buffers.magnitudeUniforms, 12, arr)
   }
 
   setMagnitudeScale (x) {
@@ -182,14 +209,16 @@ export class FFTWebGPU {
         'rg32float',
         GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
       ),
-      output: createTexture('rgba8unorm')
+      outputMagnitude: createTexture('rgba8unorm'),
+      outputPhase: createTexture('rgba8unorm')
     }
 
     this.views = {
       input: this.textures.input.createView(),
       fft: this.textures.fft.map(x => x.createView()),
       greyscaleCopy: this.textures.greyscaleCopy.createView(),
-      output: this.textures.output.createView()
+      outputMagnitude: this.textures.outputMagnitude.createView(),
+      outputPhase: this.textures.outputPhase.createView()
     }
 
     this.buffers = {
@@ -214,7 +243,7 @@ export class FFTWebGPU {
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
       }),
       magnitudeUniforms: this.device.createBuffer({
-        size: 8,
+        size: 16,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
       }),
       plotUniforms: this.device.createBuffer({
@@ -396,8 +425,9 @@ export class FFTWebGPU {
       entries: [
         { binding: 0, resource: this.views.fft[0] },
         { binding: 1, resource: this.views.fft[1] },
-        { binding: 2, resource: this.views.output },
-        { binding: 3, resource: { buffer: this.buffers.magnitudeUniforms } }
+        { binding: 2, resource: this.views.outputMagnitude },
+        { binding: 3, resource: this.views.outputPhase },
+        { binding: 4, resource: { buffer: this.buffers.magnitudeUniforms } }
       ]
     })
 
@@ -497,7 +527,8 @@ export class FFTWebGPU {
     this.renderPipelines = {
       [FFTWebGPU.InputDisplayMode.raw]: makeRenderPipeline({ GREYSCALE: false }, this.views.input),
       [FFTWebGPU.InputDisplayMode.processed]: makeRenderPipeline({ GREYSCALE: true }, this.views.fft[0]),
-      output: makeRenderPipeline({ GREYSCALE: false }, this.views.output),
+      outputMagnitude: makeRenderPipeline({ GREYSCALE: false }, this.views.outputMagnitude),
+      outputPhase: makeRenderPipeline({ GREYSCALE: false }, this.views.outputPhase)
     }
 
     this.renderExternalPipeline = this.device.createRenderPipeline({
@@ -718,13 +749,30 @@ export class FFTWebGPU {
     {
       const pass = encoder.beginRenderPass({
         colorAttachments: [{
-          view: this.ctxFFT.getCurrentTexture().createView(),
+          view: this.ctxMagnitude.getCurrentTexture().createView(),
           loadOp: "clear",
           storeOp: "store"
         }]
       })
 
-      const { pipeline, bindGroup } = this.renderPipelines.output
+      const { pipeline, bindGroup } = this.renderPipelines.outputMagnitude
+
+      pass.setPipeline(pipeline)
+      pass.setBindGroup(0, bindGroup)
+      pass.draw(3)
+      pass.end()
+    }
+
+    if (this.#renderPhase) {
+      const pass = encoder.beginRenderPass({
+        colorAttachments: [{
+          view: this.ctxPhase.getCurrentTexture().createView(),
+          loadOp: "clear",
+          storeOp: "store"
+        }]
+      })
+
+      const { pipeline, bindGroup } = this.renderPipelines.outputPhase
 
       pass.setPipeline(pipeline)
       pass.setBindGroup(0, bindGroup)

@@ -31,24 +31,29 @@
 </head>
 
 <body>
-  <main class="dashboard">
+  <main id="dashboard" class="dashboard">
     <div class="row">
       <canvas id="input-canvas" class="output left"
         title="Input image to be Fourier transformed"
         aria-label="Input image to be Fourier transformed" role="img">
         <p>Live visualization of the input signal before Fourier transformation.</p>
       </canvas>
-      <canvas id="fft-canvas" class="output right"
-        title="Fourier transformed image"
-        aria-label="Fourier transformed image" role="img">
-          <p>Live visualization of the input signal after Fourier transformation.</p>
+      <canvas id="fft-magnitude" class="output centre-or-right"
+        title="Fourier transform magnitude"
+        aria-label="Fourier transform magnitude" role="img">
+          <p>Live visualization of the magnitude of the input signal after Fourier transformation.</p>
+      </canvas>
+      <canvas id="fft-phase" class="output right hidden"
+        title="Fourier transform phase"
+        aria-label="Fourier transform phase" role="img">
+          <p>Live visualization of the phase of the input signal after Fourier transformation.</p>
       </canvas>
     </div>
     <div class="row">
       <canvas id="integration-canvas" class="output fw top"
-        title="Radial integration of the Fourier transformed image"
-        aria-label="Radial integration of the Fourier transformed image" role="img">
-          <p>Live radial integration of the Fourier transformed signal.</p>
+        title="Radial integration of the magnitude"
+        aria-label="Radial integration of the magnitude" role="img">
+          <p>Live radial integration of the magnitude of the Fourier transformed signal.</p>
       </canvas>
     </div>
   </main>
@@ -165,10 +170,10 @@
     </section>
 
     <section>
-      <label for="colourmap-select">Colour Mapping</label>
-      <select id="colourmap-select">
-        <option selected value="None">Greyscale</option>
-        <option value="Viridis">Viridis</option>
+      <label for="magnitude-colourmap-select">Magnitude Colour Mapping</label>
+      <select id="magnitude-colourmap-select">
+        <option value="None">Greyscale</option>
+        <option selected value="Viridis">Viridis</option>
         <option value="Plasma">Plasma</option>
         <option value="Magma">Magma</option>
         <option value="Inferno">Inferno</option>
@@ -177,8 +182,24 @@
     </section>
 
     <section>
-      <label for="intensity-range">Intensity Scale</label>
+      <label for="intensity-range">Magnitude Intensity Scale</label>
       <input type="range" id="intensity-range" min="1" max="100" value="25"  step="1">
+    </section>
+
+    <section>
+      <label for="phase-checkbox">Display Phase</label>
+      <input type="checkbox" id="phase-checkbox"/>
+    </section>
+
+    <section>
+      <label for="phase-colourmap-select">Phase Colour Mapping</label>
+      <select id="phase-colourmap-select">
+        <option value="None">Greyscale</option>
+        <option value="Twilight">Twilight</option>
+        <option value="Colorcet Phase 4">Colorcet Phase 4</option>
+        <option selected value="Roma">Roma</option>
+        <option value="Rainbow">Rainbow</option>
+      </select>
     </section>
   </div>
 
@@ -186,7 +207,7 @@
     <h3 id="help-title">Help</h3>
     <section>
       <h4>What am I looking at?</h4>
-      <p>The screen is split into three sections:</p>
+      <p>The screen is split into a number of sections:</p>
       <ul>
         <li>
           On the left is the input image, you can choose in the settings menu
@@ -195,13 +216,17 @@
           onto the window.
         </li>
         <li>
-          On the right is the live Fourier transformed version of that image. It
+          To its right is the live Fourier transformed version of that image. It
           displays the magnitude of the Fourier transform with a logarithmic
           scaling.
         </li>
         <li>
-          Below is the radial integration of the Fourier transformed image. The
-          x-axis shows distance from the centre, and the y-axis is the intensity.
+          If enabled in the settings, a third panel will appear on the right hand
+          side which shows the phase of the Fourier transform.
+        </li>
+        <li>
+          Below is the radial integration of the magnitude of the Fourier transform.
+          The x-axis shows distance from the centre, and the y-axis is the intensity.
         </li>
       </ul>
     </section>
@@ -218,18 +243,19 @@
       </p>
       <p>
         You can use this tool to demonstrate what X-ray scattering / diffraction
-        would look like for a variety of different structures. Simply hold a piece
-        of paper with a structure on it to the camera and see the Fourier transform
-        live. There are also a variety of examples built-in to the program.
+        would look like for a variety of different structures. Look through the
+        example images, or drag and drop your own. If presenting you can also
+        hold a piece of paper with a structure on it facing the camera and see
+        the Fourier transform live.
       </p>
     </section>
 
     <section>
       <h4>How to interpret it?</h4>
       <p>
-        The pattern on the right represents the reciprocal space of the input image.
-        Because of the inverse relationship between real and reciprocal space, the size
-        and orientation of your features will appear &ldquo;flipped.&rdquo;
+        The magnitude of the Fourier transform represents the reciprocal space of the input
+        image. Because of the inverse relationship between real and reciprocal space, the
+        size and orientation of your features will appear &ldquo;flipped.&rdquo;
       </p>
 
       <h5>Size and Shape (The Form Factor)</h5>
@@ -263,9 +289,20 @@
         sharp, discrete peaks characteristic of an infinite periodic array.
       </p>
 
+      <h5>Magnitude vs. Phase</h5>
+      <p>
+        The magnitude (intensity) tells you "how much" of a certain frequency or spacing exists.
+        However, the Fourier transform also contains phase information, which tells you "where"
+        those features are located. If you enable the &ldquo;Display Phase&rdquo; option, you
+        can see this phase. However, in an experimental measurement we can only measure the
+        intensity (magnitude) and the phase information is lost, this is commonly referred to
+        as the <em>&ldquo;Phase Problem&rdquo;</em>. Without the phase, you cannot perfectly
+        reconstruct the original image (structure).
+      </p>
+
       <h5>The 1D Integration</h5>
       <p>
-        The Radial Integration (below) converts these 2D patterns into a 1D plot. The peaks
+        The Radial Integration (below) converts the 2D magnitude into a 1D plot. The peaks
         here give you a precise way to measure the average particle size or lattice spacing.
         Peaks further towards the left represent larger features than peaks towards the
         right hand side.
