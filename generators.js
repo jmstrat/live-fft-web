@@ -258,8 +258,8 @@ class Circles extends Generator {
   }
 
   render () {
-    const y = Math.round(this.height / 2  - this.radius / 2)
-    const x = this.width / 2 - this.radius / 2
+    const y = Math.round(this.height / 2  - this.radius)
+    const x = this.width / 2 - this.radius
 
     const minGap = this.config.minGapFactor * this.width + this.radius * 2
     const maxGap = this.config.maxGapFactor * this.width
@@ -283,8 +283,8 @@ class Circles extends Generator {
 
 class MovingCircle extends Circles {
   render () {
-    let y = this.height / 2 - this.radius / 2
-    let x = this.width / 2 - this.radius / 2
+    let y = this.height / 2 - this.radius
+    let x = this.width / 2 - this.radius
     const stamp = this.stamp
 
     const t = this.getDelta()
@@ -401,7 +401,7 @@ export const Generators = {
   }),
   Orbit: new MovingCircle({
     radiusFactor: 1 / 32,
-    orbitFactor: 1 / 4,
+    orbitFactor: 1 / 32,
     oscillator: 'normSaw'
   }),
   'Two Circles': new Circles({
