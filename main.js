@@ -327,7 +327,15 @@ async function init () {
   elements.integration.height = SIZE / 2
 
   try {
-    await gpu.init(elements.input, elements.magnitude, elements.phase, elements.integration, SIZE)
+    await gpu.init(
+      {
+        input: elements.input,
+        magnitude: elements.magnitude,
+        phase: elements.phase,
+        integration: elements.integration
+      },
+      SIZE
+    )
     await initSettings()
 
     renderPatternOptions()

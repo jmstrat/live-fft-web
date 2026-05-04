@@ -1,16 +1,15 @@
-// This class handles uploading a source image to a GPU texture, then
-// running FFT and integration shaders to render the output to the 2
-// canvases provided.
-// Note that `size` must be a power of RADIX
-// e.g. for a radix of 4: 4 ^ 4 = 256 | 4 ^ 5 = 1024
-// RADIX itself must be a power of 2, higher values are typically more
-// efficient, but you quickly hit GPU storage limits.
-// If you change RADIX, you must also change the RADIX const
-// in Shaders/fft-stockham.wgsl
-// Shader constants marked "override" are set by javascript and should not be
-// changed
+import {
+  ConvertShader,
+  PeriodicPlusSmoothShader,
+  FFTShader,
+  MagnitudeShader,
+  IntegrationShader,
 
-const RADIX = 2
+  Float32Downcast,
+
+  RenderTextureShader,
+  RenderProfileShader
+} from './Shaders/index.js'
 
 export class FFTWebGPU {
 
@@ -20,42 +19,60 @@ export class FFTWebGPU {
   }
 
   static InputConversionMode = {
-    None: 0,
-    HammingWindow: 1,
-    HannWindow: 2,
-    BlackmanWindow: 3,
-    GaussianWindow: 4,
-
-    PeriodicPlusSmooth: 99
+    ...ConvertShader.WindowFunctions,
+    PeriodicPlusSmooth: Symbol()
   }
 
-  static MagnitudeColourMap = {
-    None: 0,
-    Viridis: 1,
-    Plasma: 2,
-    Magma: 3,
-    Inferno: 4,
-    Cividis: 5
-  }
 
-  static PhaseColourMap = {
-    None: 0,
-    Twilight: 1,
-    'Colorcet Phase 4': 2,
-    Roma: 3,
-    Rainbow: 4
-  }
+  static MagnitudeColourMap = MagnitudeShader.MagnitudeColourMap
+  static PhaseColourMap = MagnitudeShader.PhaseColourMap
+
+  static shaders = [
+    ConvertShader,
+    PeriodicPlusSmoothShader,
+    FFTShader,
+    MagnitudeShader,
+    IntegrationShader,
+    Float32Downcast,
+    RenderTextureShader,
+    RenderProfileShader
+  ]
+  #shaders = new Map()
 
   #inputDisplayMode = 'raw'
   #periodicPlusSmooth = false
-  #integrationBackgroundCol = [ 0, 0, 0, 1]
   #renderPhase = false
 
-  async init (inputCanvas, magnitudeCanvas, phaseCanvas, integrationCanvas, size) {
+  // canvases should be { input, magnitude, phase, integration }
+  async init (canvases, size) {
     this.size = size
-    // This is just for the integration, we don't include the corners
-    this.maxR = (size / 2) - 1
-    this.integrationBins = integrationCanvas.width
+
+    // Static configuration (never changes)
+    const config = {
+      maxIntegrationRadius: (size / 2) - 1,
+      integrationBins: canvases.integration.width
+    }
+
+    await this.#getDevice()
+    this.format = navigator.gpu.getPreferredCanvasFormat()
+
+    for (const shader of FFTWebGPU.shaders) {
+      const instance = new shader(this, size, config)
+      await instance.init()
+      this.#shaders.set(shader, instance)
+    }
+
+    const canvasContexts = {}
+    for (const [id, canvas] of Object.entries(canvases)) {
+      const context = canvas.getContext('webgpu')
+      canvasContexts[id] = context
+      context.configure({ device: this.device, format: this.format })
+    }
+    this.canvases = canvasContexts
+    this.#makeTextures()
+  }
+
+  async #getDevice () {
     if (!navigator.gpu) {
       const err = new Error('WebGPU not supported')
       err.code = 'WEBGPU_MISSING'
@@ -69,140 +86,100 @@ export class FFTWebGPU {
       throw err
     }
 
-    const requiredFeatures = []
-
-    if (this.adapter.features.has("float32-filterable")) {
-      requiredFeatures.push("float32-filterable")
-      this.canRenderFloat32 = true
-    } else {
-      console.warn('GPU cannot render float 32 textures')
-      this.canRenderFloat32 = false
+    const featuresAndLimits = this.#getDeviceRequirements()
+    for (const feature of featuresAndLimits.optionalFeatures) {
+      if (!this.adapter.features.has(feature)) {
+        console.warn('GPU does not support', feature)
+        featuresAndLimits.optionalFeatures.delete(feature)
+      }
     }
 
     try {
       this.device = await this.adapter.requestDevice({
-        requiredLimits: {
-          maxComputeWorkgroupSizeX: this.size / RADIX,
-          maxComputeInvocationsPerWorkgroup: this.size / RADIX
-        },
-        requiredFeatures
+        requiredLimits: featuresAndLimits.requiredLimits,
+        requiredFeatures: featuresAndLimits.requiredFeatures.union(featuresAndLimits.optionalFeatures)
       })
     } catch (err) {
       const wrapped = new Error('WebGPU limits unsupported', { cause: err })
       wrapped.code = 'LIMITS_UNSUPPORTED'
       throw wrapped
     }
-
-    this.format = navigator.gpu.getPreferredCanvasFormat()
-
-    this.ctxInput = inputCanvas.getContext('webgpu')
-    this.ctxInput.configure({ device: this.device, format: this.format })
-
-    this.ctxMagnitude = magnitudeCanvas.getContext('webgpu')
-    this.ctxMagnitude.configure({ device: this.device, format: this.format })
-
-    this.ctxPhase = phaseCanvas.getContext('webgpu')
-    this.ctxPhase.configure({ device: this.device, format: this.format })
-
-    this.ctxPlot = integrationCanvas.getContext('webgpu')
-    this.ctxPlot.configure({ device: this.device, format: this.format })
-
-    await this.compileShaders()
-    this.makeResources()
-    this.makePipelines()
   }
 
-  setInputTextureConvertMethod (idx) {
-    if (isNaN(idx) || idx < 0) {
-      idx = 0
+  #getDeviceRequirements () {
+    const mergedFeatures = new Set()
+    const mergedOptionalFeatures = new Set()
+    const mergedLimits = {}
+
+    for (const shader of FFTWebGPU.shaders) {
+      const requiredFeatures = shader.getRequiredFeatures(this.size)
+      const optionalFeatures = shader.getOptionalFeatures(this.size)
+      const requiredLimits = shader.getRequiredLimits(this.size)
+
+      requiredFeatures.forEach(mergedFeatures.add, mergedFeatures)
+      optionalFeatures.forEach(mergedOptionalFeatures.add, mergedOptionalFeatures)
+
+      for (const [key, value] of Object.entries(requiredLimits)) {
+        if (mergedLimits[key] === undefined) {
+          mergedLimits[key] = value
+          continue
+        }
+
+        const isMinConstraint = key.startsWith('min') || key.includes('Alignment')
+
+        if (isMinConstraint) {
+          mergedLimits[key] = Math.min(mergedLimits[key], value)
+        } else {
+          mergedLimits[key] = Math.max(mergedLimits[key], value)
+        }
+      }
     }
 
-    if (idx === FFTWebGPU.InputConversionMode.PeriodicPlusSmooth) {
-      idx = 0
-      this.#periodicPlusSmooth = true
-    } else {
-      this.#periodicPlusSmooth = false
+    return {
+      requiredFeatures: mergedFeatures,
+      optionalFeatures: mergedOptionalFeatures,
+      requiredLimits: mergedLimits
     }
-
-    const arr = new Uint32Array([idx])
-    this.device.queue.writeBuffer(this.buffers.convertUniforms, 0, arr)
   }
 
-  setInputTextureDisplayMode (mode) {
-    this.#inputDisplayMode = mode
-  }
-
-  setFlipX (bool) {
-    const arr = new Uint32Array([ bool ? 1 : 0 ])
-    this.device.queue.writeBuffer(this.buffers.convertUniforms, 4, arr)
-  }
-
-  setRenderPhase (bool) {
-    this.#renderPhase = bool
-    const arr = new Uint32Array([ bool ? 1 : 0 ])
-    this.device.queue.writeBuffer(this.buffers.magnitudeUniforms, 8, arr)
-  }
-
-  setMagnitudeColourMap (idx) {
-    if (isNaN(idx) || idx < 0 || idx > 5) {
-      idx = 0
-    }
-
-    const arr = new Uint32Array([idx])
-    this.device.queue.writeBuffer(this.buffers.magnitudeUniforms, 0, arr)
-  }
-
-  setPhaseColourMap (idx) {
-    if (isNaN(idx) || idx < 0 || idx > 4) {
-      idx = 0
-    }
-
-    const arr = new Uint32Array([idx])
-    this.device.queue.writeBuffer(this.buffers.magnitudeUniforms, 12, arr)
-  }
-
-  setMagnitudeScale (x) {
-    if (isNaN(x)) {
-      x = 0.25
-    } else if (x <= 0) {
-      x = 0.01
-    }
-
-    const arr = new Float32Array([x])
-    this.device.queue.writeBuffer(this.buffers.magnitudeUniforms, 4, arr)
-  }
-
-  setIntegrationPalette ({ bg, fg }) {
-    this.#integrationBackgroundCol = bg
-    const arr = new Float32Array(fg)
-    this.device.queue.writeBuffer(this.buffers.plotUniforms, 0, arr)
-  }
-
-  makeResources () {
-    const createTexture = (
+  #createTexture (format, usage) {
+    return this.device.createTexture({
+      size: [ this.size, this.size, 1 ],
       format,
-      usage=GPUTextureUsage.STORAGE_BINDING |
-            GPUTextureUsage.TEXTURE_BINDING
-    ) => this.device.createTexture({ size: [this.size, this.size], format, usage })
+      usage
+    })
+  }
 
+  #makeTextures () {
     this.textures = {
-      input: createTexture(
+      input: this.#createTexture(
         this.format,
-        GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_DST |
-        GPUTextureUsage.RENDER_ATTACHMENT
+        GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
       ),
-      // Complex plane storage (R: Real, G: Imaginary)
-      fft: [ createTexture(
-        'rg32float',
-        GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC
-      ), createTexture('rg32float') ],
-      greyscaleCopy: createTexture(
+
+      // (R: Real, G: Imaginary)
+      fft: [
+        this.#createTexture(
+          'rg32float',
+          GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC
+        ),
+        this.#createTexture(
+          'rg32float',
+          GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING
+        )
+      ],
+      greyscaleCopy: this.#createTexture(
         'rg32float',
         GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
       ),
-      outputMagnitude: createTexture('rgba8unorm'),
-      outputPhase: createTexture('rgba8unorm')
+      outputMagnitude: this.#createTexture(
+        'rgba8unorm',
+        GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING
+      ),
+      outputPhase: this.#createTexture(
+        'rgba8unorm',
+        GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING
+      )
     }
 
     this.views = {
@@ -212,422 +189,30 @@ export class FFTWebGPU {
       outputMagnitude: this.textures.outputMagnitude.createView(),
       outputPhase: this.textures.outputPhase.createView()
     }
-
-    this.buffers = {
-      sum: this.device.createBuffer({
-        size: this.integrationBins * 4,
-        usage: GPUBufferUsage.STORAGE
-      }),
-      count: this.device.createBuffer({
-        size: this.integrationBins * 4,
-        usage: GPUBufferUsage.STORAGE
-      }),
-      profile: this.device.createBuffer({
-        size: this.integrationBins * 4,
-        usage: GPUBufferUsage.STORAGE
-      }),
-      global_max: this.device.createBuffer({
-        size: 4,
-        usage: GPUBufferUsage.STORAGE
-      }),
-      convertUniforms: this.device.createBuffer({
-        size: 8,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-      }),
-      magnitudeUniforms: this.device.createBuffer({
-        size: 16,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-      }),
-      plotUniforms: this.device.createBuffer({
-        size: 16,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-      })
-    }
   }
 
-  async compileShaders () {
-    const shaderMap = {
-      convert: 'convert.wgsl',
-      boundaryImage: 'boundary-image.wgsl',
-      poisson: 'poisson.wgsl',
-      decompose: 'decompose.wgsl',
-      fft: 'fft-stockham.wgsl',
-      magnitude: 'magnitude.wgsl',
-      integration: 'integrate.wgsl',
-
-      render: 'render-ft.wgsl',
-      plot: 'render-plot.wgsl'
-    }
-
-    const modules = await Promise.all(
-      Object.entries(shaderMap).map(
-        async ([key, file]) => {
-          const response = await fetch(`Shaders/${file}`)
-          const code = await response.text()
-          return [key, this.device.createShaderModule({ code })]
-        }
-      )
-    )
-
-    this.shaders = Object.fromEntries(modules)
-  }
-
-  makePipelines () {
-    this.convertPipeline = this.device.createComputePipeline({
-      layout: 'auto',
-      compute: {
-        module: this.shaders.convert,
-        entryPoint: 'main',
-        constants: {
-          STORE_RGBA_COPY: !this.canRenderFloat32
-        }
-      }
-    })
-
-    this.convertExternalPipeline = this.device.createComputePipeline({
-      layout: 'auto',
-      compute: {
-        module: this.shaders.convert,
-        entryPoint: 'main_external',
-        constants: {
-          STORE_RGBA_COPY: !this.canRenderFloat32
-        }
-      }
-    })
-
-    // Note that view.outputPhase is only used if !this.canRenderFloat32
-    // See the note about the render pipeline below
-
-    this.convertBindGroup = this.device.createBindGroup({
-      layout: this.convertPipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: this.views.input },
-        { binding: 2, resource: this.views.fft[0] },
-        { binding: 3, resource: this.views.outputPhase },
-        { binding: 4, resource: { buffer: this.buffers.convertUniforms } }
-      ]
-    })
-
-    const ConvertExternalBindGroupLayout = this.convertExternalPipeline.getBindGroupLayout(0)
-    this.makeConvertExternalBindGroup = (externalTexture) => {
-      return this.device.createBindGroup({
-        layout: ConvertExternalBindGroupLayout,
-        entries: [
-          { binding: 1, resource: externalTexture },
-          { binding: 2, resource: this.views.fft[0] },
-          { binding: 3, resource: this.views.outputPhase },
-          { binding: 4, resource: { buffer: this.buffers.convertUniforms } }
-        ]
-      })
-    }
-
-    this.boundaryImagePipeline = this.device.createComputePipeline({
-      layout: 'auto',
-      compute: { module: this.shaders.boundaryImage }
-    })
-
-    this.boundaryImageBindGroup = this.device.createBindGroup({
-      layout: this.boundaryImagePipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: this.views.greyscaleCopy },
-        { binding: 1, resource: this.views.fft[0] }
-      ]
-    })
-
-    this.poissonPipeline = this.device.createComputePipeline({
-      layout: 'auto',
-      compute: { module: this.shaders.poisson }
-    })
-
-    this.poissonBindGroup = this.device.createBindGroup({
-      layout: this.poissonPipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: this.views.fft[0] },
-        { binding: 1, resource: this.views.fft[1] }
-      ]
-    })
-
-    this.decomposePipeline = this.device.createComputePipeline({
-      layout: 'auto',
-      compute: { module: this.shaders.decompose }
-    })
-
-    this.decomposeBindGroup = this.device.createBindGroup({
-      layout: this.decomposePipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: this.views.greyscaleCopy },
-        { binding: 1, resource: this.views.fft[1] },
-        { binding: 2, resource: this.views.fft[0] }
-      ]
-    })
-
-    this.fftPipeline = this.device.createComputePipeline({
-      layout: 'auto',
-      compute: {
-        module: this.shaders.fft,
-        constants: {
-          N: this.size,
-          WORKGROUP_SIZE: this.size / RADIX
-        }
-      }
-    })
-
-    this.invFftPipeline = this.device.createComputePipeline({
-      layout: 'auto',
-      compute: {
-        module: this.shaders.fft,
-        constants: {
-          N: this.size,
-          WORKGROUP_SIZE: this.size / RADIX,
-          INVERSE: true
-        }
-      }
-    })
-
-    this.fftBindGroups = new Array(2)
-    this.fftBindGroups[0] = this.device.createBindGroup({
-      layout: this.fftPipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: this.views.fft[0] },
-        { binding: 1, resource: this.views.fft[1] }
-      ]
-    })
-
-    this.fftBindGroups[1] = this.device.createBindGroup({
-      layout: this.fftPipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: this.views.fft[1] },
-        { binding: 1, resource: this.views.fft[0] }
-      ]
-    })
-
-    this.invFftBindGroups = new Array(2)
-    this.invFftBindGroups[0] = this.device.createBindGroup({
-      layout: this.invFftPipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: this.views.fft[0] },
-        { binding: 1, resource: this.views.fft[1] }
-      ]
-    })
-
-    this.invFftBindGroups[1] = this.device.createBindGroup({
-      layout: this.invFftPipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: this.views.fft[1] },
-        { binding: 1, resource: this.views.fft[0] }
-      ]
-    })
-
-    this.magnitudePipeline = this.device.createComputePipeline({
-      layout: 'auto',
-      compute: { module: this.shaders.magnitude }
-    })
-
-    this.magnitudeBindGroup = this.device.createBindGroup({
-      layout: this.magnitudePipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: this.views.fft[0] },
-        { binding: 1, resource: this.views.fft[1] },
-        { binding: 2, resource: this.views.outputMagnitude },
-        { binding: 3, resource: this.views.outputPhase },
-        { binding: 4, resource: { buffer: this.buffers.magnitudeUniforms } }
-      ]
-    })
-
-    // n.b. this.views.fft[1] is now magnitude, dist
-
-    this.integrationClearPipeline = this.device.createComputePipeline({
-      layout: 'auto',
-      compute: {
-        module: this.shaders.integration,
-        entryPoint: 'clear',
-        constants: {
-          NUM_BINS: this.integrationBins
-        }
-      }
-    })
-
-    this.integrationPipeline = this.device.createComputePipeline({
-      layout: 'auto',
-      compute: {
-        module: this.shaders.integration,
-        entryPoint: 'sum',
-        constants: {
-          NUM_BINS: this.integrationBins,
-          MAX_RADIUS: this.maxR
-        }
-      }
-    })
-
-    this.integrationNormPipeline = this.device.createComputePipeline({
-      layout: 'auto',
-      compute: {
-        module: this.shaders.integration,
-        entryPoint: 'norm',
-        constants: {
-          NUM_BINS: this.integrationBins
-        }
-      }
-    })
-
-    this.integrationClearBindGroup = this.device.createBindGroup({
-      layout: this.integrationClearPipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 1, resource: { buffer: this.buffers.sum } },
-        { binding: 2, resource: { buffer: this.buffers.count } },
-        { binding: 4, resource: { buffer: this.buffers.global_max } }
-      ]
-    })
-
-    this.integrationBindGroup = this.device.createBindGroup({
-      layout: this.integrationPipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: this.views.fft[1] },
-        { binding: 1, resource: { buffer: this.buffers.sum } },
-        { binding: 2, resource: { buffer: this.buffers.count } }
-      ]
-    })
-
-    this.integrationNormBindGroup = this.device.createBindGroup({
-      layout: this.integrationNormPipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 1, resource: { buffer: this.buffers.sum } },
-        { binding: 2, resource: { buffer: this.buffers.count } },
-        { binding: 3, resource: { buffer: this.buffers.profile } },
-        { binding: 4, resource: { buffer: this.buffers.global_max } }
-      ]
-    })
-
-    const sampler = this.device.createSampler({
-      magFilter: "linear",
-      minFilter: "linear"
-    })
-
-    const makeRenderPipeline = (constants, view) => {
-      const pipeline = this.device.createRenderPipeline({
-        layout: 'auto',
-        vertex: {
-          module: this.shaders.render
-        },
-        fragment: {
-          module: this.shaders.render,
-          targets: [{ format: this.format }],
-          entryPoint: 'fs',
-          constants
-        }
-      })
-
-      const bindGroup = this.device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: view },
-          { binding: 2, resource: sampler }
-        ]
-      })
-      return { pipeline, bindGroup }
-    }
-
-    this.renderPipelines = {
-      [FFTWebGPU.InputDisplayMode.raw]: makeRenderPipeline({ GREYSCALE: false }, this.views.input),
-      outputMagnitude: makeRenderPipeline({ GREYSCALE: false }, this.views.outputMagnitude),
-      outputPhase: makeRenderPipeline({ GREYSCALE: false }, this.views.outputPhase)
-    }
-
-    if (this.canRenderFloat32) {
-      this.renderPipelines[FFTWebGPU.InputDisplayMode.processed] =
-        makeRenderPipeline({ GREYSCALE: true }, this.views.fft[0])
-    } else {
-      // If we can't render the processed texture directly, we temporarily copy
-      // it to a renderable texture. Rather than use another texture we can
-      // use one of the output textures which are not used at this point in the
-      // render workflow. Note also the changes to the convert pipeline
-      this.renderPipelines[FFTWebGPU.InputDisplayMode.processed] =
-        makeRenderPipeline({ GREYSCALE: true }, this.views.outputPhase)
-    }
-
-    this.renderExternalPipeline = this.device.createRenderPipeline({
-      layout: 'auto',
-      vertex: {
-        module: this.shaders.render
-      },
-      fragment: {
-        module: this.shaders.render,
-        targets: [{ format: this.format }],
-        entryPoint: 'fs_external',
-        constants: { GREYSCALE: false }
-      }
-    })
-
-    const RenderExternalBindGroupLayout = this.renderExternalPipeline.getBindGroupLayout(0)
-
-    this.makeRenderExternalBindGroup = (externalTexture) => {
-      return this.device.createBindGroup({
-        layout: RenderExternalBindGroupLayout,
-        entries: [
-          { binding: 1, resource: externalTexture },
-          { binding: 2, resource: sampler }
-        ]
-      })
-    }
-
-    this.plotPipeline = this.device.createRenderPipeline({
-      layout: 'auto',
-      vertex: {
-        module: this.shaders.plot,
-        constants: {
-          SIZE: this.integrationBins
-        }
-      },
-      fragment: {
-        module: this.shaders.plot,
-        targets: [{ format: this.format }]
-      },
-      primitive: { topology: "line-strip" }
-    })
-
-    this.plotBindGroup = this.device.createBindGroup({
-      layout: this.plotPipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: this.buffers.profile } },
-        { binding: 1, resource: { buffer: this.buffers.global_max } },
-        { binding: 2, resource: { buffer: this.buffers.plotUniforms } }
-      ]
-    })
+  getShaderInstance (cls) {
+    return this.#shaders.get(cls)
   }
 
   render (source) {
-
     const encoder = this.device.createCommandEncoder()
+    const shaders = this.#shaders
 
-    if (source instanceof GPUExternalTexture) {
-      {
-        const pass = encoder.beginComputePass()
-        pass.setPipeline(this.convertExternalPipeline)
-        pass.setBindGroup(0, this.makeConvertExternalBindGroup(source))
-        pass.dispatchWorkgroups(
-          Math.ceil(this.size / 8),
-          Math.ceil(this.size / 8)
-        )
-        pass.end()
-      }
-    } else {
+    if (!(source instanceof GPUExternalTexture)) {
       this.device.queue.copyExternalImageToTexture(
         { source },
         { texture: this.textures.input },
         [this.size, this.size]
       )
-
-      {
-        const pass = encoder.beginComputePass()
-        pass.setPipeline(this.convertPipeline)
-        pass.setBindGroup(0, this.convertBindGroup)
-        pass.dispatchWorkgroups(
-          Math.ceil(this.size / 8),
-          Math.ceil(this.size / 8)
-        )
-        pass.end()
-      }
+      source = this.views.input
     }
+
+    shaders.get(ConvertShader).run(
+      encoder,
+      source,
+      this.views.fft[0]
+    )
 
     if (this.#periodicPlusSmooth) {
       // Backup the greyscale image (I)
@@ -637,210 +222,113 @@ export class FFTWebGPU {
         [this.size, this.size]
       )
 
-      // Compute Boundary Image from I -> V
-      {
-        const pass = encoder.beginComputePass()
-        pass.setPipeline(this.boundaryImagePipeline)
-        pass.setBindGroup(0, this.boundaryImageBindGroup)
-        pass.dispatchWorkgroups(
-          Math.ceil(this.size / 8),
-          Math.ceil(this.size / 8)
-        )
-        pass.end()
-      }
-
-      // FFT(V) -> V-hat
-      {
-        const pass = encoder.beginComputePass()
-        pass.setPipeline(this.fftPipeline)
-        pass.setBindGroup(0, this.fftBindGroups[0])
-        pass.dispatchWorkgroups(1, this.size)
-        pass.end()
-      }
-
-      {
-        const pass = encoder.beginComputePass()
-        pass.setPipeline(this.fftPipeline)
-        pass.setBindGroup(0, this.fftBindGroups[1])
-        pass.dispatchWorkgroups(1, this.size)
-        pass.end()
-      }
-
-      // Poisson Filter on V-hat -> S-hat
-      {
-        const pass = encoder.beginComputePass()
-        pass.setPipeline(this.poissonPipeline)
-        pass.setBindGroup(0, this.poissonBindGroup)
-        pass.dispatchWorkgroups(
-          Math.ceil(this.size / 8),
-          Math.ceil(this.size / 8)
-        )
-        pass.end()
-      }
-
-      // InvFFT(S-hat) -> s
-      {
-        const pass = encoder.beginComputePass()
-        pass.setPipeline(this.invFftPipeline)
-        pass.setBindGroup(0, this.invFftBindGroups[1])
-        pass.dispatchWorkgroups(1, this.size)
-        pass.end()
-      }
-
-      {
-        const pass = encoder.beginComputePass()
-        pass.setPipeline(this.invFftPipeline)
-        pass.setBindGroup(0, this.invFftBindGroups[0])
-        pass.dispatchWorkgroups(1, this.size)
-        pass.end()
-      }
-
-      // I - s
-      {
-        const pass = encoder.beginComputePass()
-        pass.setPipeline(this.decomposePipeline)
-        pass.setBindGroup(0, this.decomposeBindGroup)
-        pass.dispatchWorkgroups(
-          Math.ceil(this.size / 8),
-          Math.ceil(this.size / 8)
-        )
-        pass.end()
-      }
-    }
-
-    {
-      const pass = encoder.beginRenderPass({
-        colorAttachments: [{
-          view: this.ctxInput.getCurrentTexture().createView(),
-          loadOp: "clear",
-          storeOp: "store"
-        }]
-      })
-
-      if (
-        this.#inputDisplayMode === FFTWebGPU.InputDisplayMode.raw &&
-        source instanceof GPUExternalTexture
-      ) {
-        pass.setPipeline(this.renderExternalPipeline)
-        pass.setBindGroup(0, this.makeRenderExternalBindGroup(source))
-      } else {
-        const { pipeline, bindGroup } = this.renderPipelines[this.#inputDisplayMode]
-        pass.setPipeline(pipeline)
-        pass.setBindGroup(0, bindGroup)
-      }
-
-      pass.draw(3)
-      pass.end()
-    }
-
-    {
-      const pass = encoder.beginComputePass()
-      pass.setPipeline(this.fftPipeline)
-      pass.setBindGroup(0, this.fftBindGroups[0])
-      pass.dispatchWorkgroups(1, this.size)
-      pass.end()
-    }
-
-    {
-      const pass = encoder.beginComputePass()
-      pass.setPipeline(this.fftPipeline)
-      pass.setBindGroup(0, this.fftBindGroups[1])
-      pass.dispatchWorkgroups(1, this.size)
-      pass.end()
-    }
-
-    {
-      const pass = encoder.beginComputePass()
-      pass.setPipeline(this.magnitudePipeline)
-      pass.setBindGroup(0, this.magnitudeBindGroup)
-      pass.dispatchWorkgroups(
-        Math.ceil(this.size / 8),
-        Math.ceil(this.size / 8)
+      shaders.get(PeriodicPlusSmoothShader).run(
+        encoder,
+        this.views.greyscaleCopy,
+        ...this.views.fft
       )
-      pass.end()
     }
 
-    {
-      const pass = encoder.beginRenderPass({
-        colorAttachments: [{
-          view: this.ctxMagnitude.getCurrentTexture().createView(),
-          loadOp: "clear",
-          storeOp: "store"
-        }]
-      })
+    // With or without periodic plus smooth, the
+    // processed image is stored in this.textures.fft[0]
 
-      const { pipeline, bindGroup } = this.renderPipelines.outputMagnitude
+    if (this.#inputDisplayMode === FFTWebGPU.InputDisplayMode.raw) {
+      shaders.get(RenderTextureShader).run(
+        encoder,
+        source,
+        this.canvases.input.getCurrentTexture().createView()
+      )
+    } else {
+      const downcast = shaders.get(Float32Downcast)
+      let processedTexture = this.views.fft[0]
+      if (downcast.active) {
+        // Downcast the processed float32 texture to an 8-bit texture
+        // Only necessary on older GPUs
+        downcast.run(encoder, this.views.fft[0], this.views.outputPhase)
+        processedTexture = this.views.outputPhase
+      }
 
-      pass.setPipeline(pipeline)
-      pass.setBindGroup(0, bindGroup)
-      pass.draw(3)
-      pass.end()
+      shaders.get(RenderTextureShader).runGreyscale(
+        encoder,
+        processedTexture,
+        this.canvases.input.getCurrentTexture().createView()
+      )
     }
+
+    shaders.get(FFTShader).run(encoder, ...this.views.fft)
+
+    shaders.get(MagnitudeShader).run(
+      encoder,
+      this.views.fft[0],
+      this.views.fft[1],
+      this.views.outputMagnitude,
+      this.views.outputPhase
+    )
+
+    shaders.get(RenderTextureShader).run(
+      encoder,
+      this.views.outputMagnitude,
+      this.canvases.magnitude.getCurrentTexture().createView()
+    )
 
     if (this.#renderPhase) {
-      const pass = encoder.beginRenderPass({
-        colorAttachments: [{
-          view: this.ctxPhase.getCurrentTexture().createView(),
-          loadOp: "clear",
-          storeOp: "store"
-        }]
-      })
-
-      const { pipeline, bindGroup } = this.renderPipelines.outputPhase
-
-      pass.setPipeline(pipeline)
-      pass.setBindGroup(0, bindGroup)
-      pass.draw(3)
-      pass.end()
-    }
-
-    {
-      const pass = encoder.beginComputePass()
-      pass.setPipeline(this.integrationClearPipeline)
-      pass.setBindGroup(0, this.integrationClearBindGroup)
-      pass.dispatchWorkgroups(
-        Math.ceil(this.integrationBins / 64)
+      shaders.get(RenderTextureShader).run(
+        encoder,
+        this.views.outputPhase,
+        this.canvases.phase.getCurrentTexture().createView()
       )
-      pass.end()
     }
 
-    {
-      const pass = encoder.beginComputePass()
-      pass.setPipeline(this.integrationPipeline)
-      pass.setBindGroup(0, this.integrationBindGroup)
-      pass.dispatchWorkgroups(
-        Math.ceil(this.size / 8),
-        Math.ceil(this.size / 8)
-      )
-      pass.end()
-    }
+    shaders.get(IntegrationShader).run(encoder, this.views.fft[1])
 
-    {
-      const pass = encoder.beginComputePass()
-      pass.setPipeline(this.integrationNormPipeline)
-      pass.setBindGroup(0, this.integrationNormBindGroup)
-      pass.dispatchWorkgroups(
-        Math.ceil(this.integrationBins / 64)
-      )
-      pass.end()
-    }
-
-    {
-      const pass = encoder.beginRenderPass({
-        colorAttachments: [{
-          view: this.ctxPlot.getCurrentTexture().createView(),
-          loadOp: "clear",
-          storeOp: "store",
-          clearValue: this.#integrationBackgroundCol
-        }]
-      })
-
-      pass.setPipeline(this.plotPipeline)
-      pass.setBindGroup(0, this.plotBindGroup)
-      pass.draw(this.integrationBins)
-      pass.end()
-    }
+    shaders.get(RenderProfileShader).run(
+      encoder,
+      shaders.get(IntegrationShader).profile,
+      shaders.get(IntegrationShader).global_max,
+      this.canvases.integration.getCurrentTexture().createView()
+    )
 
     this.device.queue.submit([encoder.finish()])
+  }
+
+
+  // Settings
+  setInputTextureConvertMethod (idx) {
+    if (idx === FFTWebGPU.InputConversionMode.PeriodicPlusSmooth) {
+      idx = FFTWebGPU.InputConversionMode.None
+      this.#periodicPlusSmooth = true
+    } else {
+      this.#periodicPlusSmooth = false
+    }
+    this.#shaders.get(ConvertShader).setWindow(idx)
+  }
+
+  setInputTextureDisplayMode (mode) {
+    this.#inputDisplayMode = mode
+  }
+
+  setFlipX (bool) {
+    this.#shaders.get(ConvertShader).setFlipX(bool)
+  }
+
+  setRenderPhase (bool) {
+    this.#renderPhase = bool
+    this.#shaders.get(MagnitudeShader).setCalcPhase(bool)
+  }
+
+  setMagnitudeColourMap (idx) {
+    this.#shaders.get(MagnitudeShader).setMagnitudeColourMap(idx)
+  }
+
+  setPhaseColourMap (idx) {
+    this.#shaders.get(MagnitudeShader).setPhaseColourMap(idx)
+  }
+
+  setMagnitudeScale (x) {
+    this.#shaders.get(MagnitudeShader).setMagnitudeScale(x)
+  }
+
+  setIntegrationPalette (pal) {
+    this.#shaders.get(RenderProfileShader).setPalette(pal)
   }
 }
