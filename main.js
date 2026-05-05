@@ -14,6 +14,12 @@ const SIZE = 512 // Must be a power of RADIX (default 2)
 
 const gpu = new FFTWebGPU()
 const camera = new Camera(SIZE)
+
+camera.addEventListener('error', (event) => {
+  const err = event.detail
+  showError(err)
+})
+
 const imageCache = new ImageCache(SIZE, SIZE)
 initGenerators(SIZE, SIZE)
 let isReady = false
@@ -57,20 +63,24 @@ const settings = {
       elements.genSection.classList.toggle('hidden', !isGenerator)
       elements.imageSection.classList.toggle('hidden', !isImage)
 
+      warnIfImageModeAndNoImages()
+
       if (isCamera) {
         try {
           const deviceID = await camera.start(settings.deviceId.value)
           settings.deviceId.store(deviceID)
 
           await refreshCameraOptions()
+          _hideError()
         } catch (err) {
           showError(err)
+          return
         }
       } else {
         camera.stop()
+        _hideError()
       }
 
-      warnIfImageModeAndNoImages()
       markDirty()
       loop.start()
     }
@@ -88,6 +98,7 @@ const settings = {
       try {
         const deviceID = await camera.start(v)
         settings.deviceId.store(deviceID)
+        _hideError()
       } catch (err) {
         showError(err)
       }
@@ -553,6 +564,7 @@ function showError (err) {
   let title = "Application Error"
   let message = "An unexpected error occurred."
   let code
+  let modal = true
 
   switch (err.code || err.name) {
     case 'WEBGPU_MISSING':
@@ -570,15 +582,38 @@ function showError (err) {
     case 'OverconstrainedError':
       title = "Camera Error"
       message = "Unable to capture images from your camera at the required resolution."
+      modal = false
+      break
+    case 'CAMERA_DENIED':
+    case 'CAMERA_REVOKED':
+      title = 'Camera Permission Denied'
+      message = "If you wish to use the live camera input, you must enable the camera permission in your browser and OS settings. You can use the other input modes without granting camera permission."
+      modal = false
+      break
+    case 'CAMERA_ERROR':
+      title = 'Camera Error'
+      message = 'The camera could not be started, please try another camera or a different input mode.'
+      code = err.message
+      modal = false
+      break
+    case 'CAMERA_STOPPED':
+      title = 'Camera Error'
+      message = "The camera unexpectedly stopped."
+      modal = false
+      break
+    case 'CAMERA_DISCONNECTED':
+      title = 'Camera Disconnected'
+      message = "The selected camera is no-longer available. Please reconnect the device or choose an alternative camera or input mode."
+      modal = false
       break
     default:
       message = `${message}\n${err.message || err.name}.`
       code = err.code
   }
-  _showError(title, message, code)
+  _showError(title, message, code, modal)
 }
 
-function _showError (title, message, code = "") {
+function _showError (title, message, code = "", modal=true) {
   elements.errorTitle.textContent = title
   elements.errorMsg.textContent = message
 
@@ -589,7 +624,12 @@ function _showError (title, message, code = "") {
     elements.errorCode.classList.add('hidden')
   }
 
+  elements.errorOverlay.classList.toggle('modal', modal)
   elements.errorOverlay.classList.remove('hidden')
+}
+
+function _hideError () {
+  elements.errorOverlay.classList.add('hidden')
 }
 
 init()

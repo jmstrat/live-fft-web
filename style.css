@@ -330,6 +330,10 @@ input[type="checkbox"]:focus {
   text-align: center;
 }
 
+.overlay:not(.modal) {
+  z-index: 0;
+}
+
 .card {
   background: var(--panel-colour);
   padding: 2rem;
@@ -389,13 +393,8 @@ input[type="checkbox"]:focus {
   display: inline;
 }
 
+#no-images-overlay,
 #drop-overlay {
-  pointer-events: none;
-  z-index: 99;
-}
-
-#no-images-overlay {
-  z-index: 0;
   pointer-events: none;
 }
 

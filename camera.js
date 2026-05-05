@@ -1,4 +1,4 @@
-export class Camera {
+export class Camera extends EventTarget {
   #size
   #stream = null
   #activeDeviceId = null
@@ -6,6 +6,7 @@ export class Camera {
   #callbackHandle = null
 
   constructor (idealSize=512) {
+    super()
     this.#size = idealSize
 
     this.#video = document.createElement('video')
@@ -18,6 +19,11 @@ export class Camera {
     const devices = await navigator.mediaDevices.enumerateDevices()
     return devices
     .filter(({ kind }) => kind === 'videoinput')
+  }
+
+  async #deviceExists (deviceID) {
+    const devices = await this.getDevices()
+    return devices.some(d => d.deviceId === deviceID)
   }
 
   async start (deviceId = null) {
@@ -35,28 +41,38 @@ export class Camera {
       }
     }
 
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const newStream = await navigator.mediaDevices.getUserMedia(constraints)
-        await this.#setStream(newStream)
-        return this.#activeDeviceId
-      } catch (err) {
-        const isDeviceError = ['NotFoundError', 'DevicesNotFoundError', 'OverconstrainedError'].includes(err.name)
-
-        if (constraints.video.deviceId && isDeviceError && attempt === 0) {
-          console.error(`Camera ${constraints.video.deviceId.exact} not found`)
-          delete constraints.video.deviceId
-          continue
-        }
-
-        throw err
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia(constraints)
+      await this.#setStream(newStream)
+      return this.#activeDeviceId
+    } catch (err) {
+      if (err.name === 'NotAllowedError') {
+        const wrapped = new Error('Camera permission denied', { cause: err })
+        wrapped.code = 'CAMERA_DENIED'
+        throw wrapped
       }
+
+      if (deviceId) {
+        const maybeErr = await this.#getCameraError(deviceId)
+        if (maybeErr) {
+          throw maybeErr
+        }
+      }
+
+      if (['NotFoundError', 'DevicesNotFoundError', 'OverconstrainedError'].includes(err.name)) {
+        const wrapped = new Error('Camera unsupported', { cause: err })
+        wrapped.code = 'CAMERA_ERROR'
+        throw wrapped
+      }
+
+      throw err
     }
   }
 
   stop () {
     if (this.#stream) {
       this.#stream.getTracks().forEach(track => {
+        track.removeEventListener('ended', this.#handleTrackEnded)
         track.stop()
       })
       this.#video.srcObject = null
@@ -119,9 +135,48 @@ export class Camera {
     this.stop()
     this.#stream = stream
     this.#video.srcObject = stream
+
     const track = stream.getVideoTracks()[0]
+    track.addEventListener('ended', this.#handleTrackEnded)
+
     this.#activeDeviceId = track.getSettings().deviceId
     await this.#video.play()
+  }
+
+  async #getCameraError (deviceID) {
+    this.stop()
+    let deviceExists
+
+    try {
+      const { state } = await navigator.permissions.query({ name: 'camera' })
+      if (state === 'denied') {
+        const err = new Error('Camera permission was revoked')
+        err.code = 'CAMERA_REVOKED'
+        return err
+      } else {
+        deviceExists = await this.#deviceExists(deviceID)
+      }
+    } catch (e) {
+      console.error(e)
+      deviceExists = await this.#deviceExists(deviceID)
+    }
+
+    if (!deviceExists) {
+      const err = new Error('Camera hardware was disconnected')
+      err.code = 'CAMERA_DISCONNECTED'
+      return err
+    }
+  }
+
+  #handleTrackEnded = async () => {
+    let err = await this.#getCameraError(this.#activeDeviceId)
+
+    if (!err) {
+      err = new Error('Camera stopped unexpectedly')
+      err.code = 'CAMERA_STOPPED'
+    }
+
+    this.dispatchEvent(new CustomEvent('error', { detail: err }))
   }
 
   get isReady () {
