@@ -1,3 +1,5 @@
+import { Camera } from "./Sources/Camera/adapter.js"
+
 const elements = {
   overlay: document.getElementById('error-overlay'),
   title: document.getElementById('error-title'),
@@ -30,24 +32,24 @@ export function showError (err) {
       message = "Unable to capture images from your camera at the required resolution."
       modal = false
       break
-    case 'CAMERA_DENIED':
-    case 'CAMERA_REVOKED':
+    case Camera.errorCodes.PermissionDenied:
+    case Camera.errorCodes.PermissionRevoked:
       title = 'Camera Permission Denied'
       message = "If you wish to use the live camera input, you must enable the camera permission in your browser and OS settings. You can use the other input modes without granting camera permission."
       modal = false
       break
-    case 'CAMERA_ERROR':
+    case Camera.errorCodes.Generic:
       title = 'Camera Error'
       message = 'The camera could not be started, please try another camera or a different input mode.'
       code = err.message
       modal = false
       break
-    case 'CAMERA_STOPPED':
+    case Camera.errorCodes.Stopped:
       title = 'Camera Error'
       message = "The camera unexpectedly stopped."
       modal = false
       break
-    case 'CAMERA_DISCONNECTED':
+    case Camera.errorCodes.Disconnected:
       title = 'Camera Disconnected'
       message = "The selected camera is no-longer available. Please reconnect the device or choose an alternative camera or input mode."
       modal = false

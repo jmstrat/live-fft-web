@@ -1,4 +1,16 @@
 export class Camera extends EventTarget {
+  static events = {
+    error: 'error'
+  }
+
+  static errorCodes = {
+    PermissionDenied: 'CAMERA_DENIED',
+    PermissionRevoked: 'CAMERA_REVOKED',
+    Disconnected: 'CAMERA_DISCONNECTED',
+    Stopped: 'CAMERA_STOPPED',
+    Generic: 'CAMERA_ERROR'
+  }
+
   #size
   #stream = null
   #activeDeviceId = null
@@ -48,7 +60,7 @@ export class Camera extends EventTarget {
     } catch (err) {
       if (err.name === 'NotAllowedError') {
         const wrapped = new Error('Camera permission denied', { cause: err })
-        wrapped.code = 'CAMERA_DENIED'
+        wrapped.code = Camera.errorCodes.PermissionDenied
         throw wrapped
       }
 
@@ -61,7 +73,7 @@ export class Camera extends EventTarget {
 
       if (['NotFoundError', 'DevicesNotFoundError', 'OverconstrainedError'].includes(err.name)) {
         const wrapped = new Error('Camera unsupported', { cause: err })
-        wrapped.code = 'CAMERA_ERROR'
+        wrapped.code = Camera.errorCodes.Generic
         throw wrapped
       }
 
@@ -151,7 +163,7 @@ export class Camera extends EventTarget {
       const { state } = await navigator.permissions.query({ name: 'camera' })
       if (state === 'denied') {
         const err = new Error('Camera permission was revoked')
-        err.code = 'CAMERA_REVOKED'
+        err.code = Camera.errorCodes.PermissionRevoked
         return err
       } else {
         deviceExists = await this.#deviceExists(deviceID)
@@ -163,7 +175,7 @@ export class Camera extends EventTarget {
 
     if (!deviceExists) {
       const err = new Error('Camera hardware was disconnected')
-      err.code = 'CAMERA_DISCONNECTED'
+      err.code = Camera.errorCodes.Disconnected
       return err
     }
   }
@@ -173,10 +185,10 @@ export class Camera extends EventTarget {
 
     if (!err) {
       err = new Error('Camera stopped unexpectedly')
-      err.code = 'CAMERA_STOPPED'
+      err.code = Camera.errorCodes.Stopped
     }
 
-    this.dispatchEvent(new CustomEvent('error', { detail: err }))
+    this.dispatchEvent(new CustomEvent(Camera.events.error, { detail: err }))
   }
 
   get isReady () {

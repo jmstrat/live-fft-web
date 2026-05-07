@@ -431,13 +431,3 @@ export const Generators = {
     type: 'hex'
   })
 }
-
-export function init (width, height) {
-  const sharedCanvas = new OffscreenCanvas(width, height)
-  const ctx = sharedCanvas.getContext('2d', { willReadFrequently: true, alpha: false })
-  Object.values(Generators).forEach(g => g.init(sharedCanvas, ctx))
-}
-
-export function setPalette (palette) {
-  Object.values(Generators).forEach(g => g.setPalette(palette))
-}
