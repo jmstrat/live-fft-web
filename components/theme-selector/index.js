@@ -1,4 +1,10 @@
-import styles from './styles.css' with { type: 'css' }
+// NOTE this is not supported on Safari
+// https://bugs.webkit.org/show_bug.cgi?id=227967
+// import styles from './styles.css' with { type: 'css' }
+// So we fallback to fetch + manual stylesheet creation for now
+const cssText = await fetch('components/theme-selector/styles.css').then(res => res.text())
+const styles = new CSSStyleSheet()
+styles.replaceSync(cssText)
 
 class ThemeSelector extends HTMLElement {
   #query = window.matchMedia('(prefers-color-scheme: dark)')
