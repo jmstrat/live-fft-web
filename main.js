@@ -1,3 +1,4 @@
+import { SettingsManager } from './settings.js'
 import { FFTWebGPU } from './gpu.js'
 import { Camera } from './camera.js'
 import { Generators, init as initGenerators, setPalette } from './generators.js'
@@ -12,6 +13,7 @@ import { RenderLoop } from './render-loop.js'
 
 const SIZE = 512 // Must be a power of RADIX (default 2)
 
+const settings = new SettingsManager()
 const gpu = new FFTWebGPU()
 const camera = new Camera(SIZE)
 
@@ -32,11 +34,11 @@ const SOURCES = {
 }
 
 function getActiveGenerator () {
-  return Generators[settings.currentPattern.value] ?? Generators[Object.keys(Generators)[0]]
+  return Generators[settings.get('currentPattern')] ?? Generators[Object.keys(Generators)[0]]
 }
 
 function markDirty () {
-  const mode = settings.sourceMode.value
+  const mode = settings.get('sourceMode')
 
   if (mode === SOURCES.GENERATOR) {
     getActiveGenerator()?.markDirty?.()
@@ -45,7 +47,7 @@ function markDirty () {
   }
 }
 
-const settings = {
+const SETTING_DESCRIPTORS = {
   // Sources
   sourceMode: {
     el: document.getElementById('source-select'),
@@ -65,8 +67,8 @@ const settings = {
 
       if (isCamera) {
         try {
-          const deviceID = await camera.start(settings.deviceId.value)
-          settings.deviceId.store(deviceID)
+          const deviceID = await camera.start(settings.get('deviceId'))
+          settings.set('deviceId', deviceID)
 
           await refreshCameraOptions()
           _hideError()
@@ -88,14 +90,14 @@ const settings = {
     storageKey: 'camera',
     default: null,
     onchange: async (v) => {
-      if (settings.sourceMode.value !== SOURCES.CAMERA) {
+      if (settings.get('sourceMode') !== SOURCES.CAMERA) {
         return
       }
 
       await loop.stop()
       try {
         const deviceID = await camera.start(v)
-        settings.deviceId.store(deviceID)
+        settings.set('deviceId', deviceID)
         _hideError()
       } catch (err) {
         showError(err)
@@ -198,7 +200,7 @@ const settings = {
     el: document.getElementById('theme-switcher'),
     storageKey: 'theme',
     default: 'auto',
-    onchange: (v, e) => {
+    onchange: (v) => {
       const isLight = v === 'light'
       document.body.classList.toggle('light-mode', isLight)
       const white = [ 1, 1, 1, 1 ]
@@ -221,13 +223,6 @@ const settings = {
         document.head.appendChild(activeMeta)
       }
       activeMeta.setAttribute("content", bgColour)
-
-      if (!e) {
-        return
-      }
-      if (!e.target.matches(':focus-visible')) {
-        e.target.blur()
-      }
     }
   }
 }
@@ -265,7 +260,7 @@ const loop = new RenderLoop(
     if (!isReady) {
       return false
     }
-    if (settings.sourceMode.value === SOURCES.CAMERA) {
+    if (settings.get('sourceMode') === SOURCES.CAMERA) {
       return camera.requestFrame(cb)
     } else {
       return requestAnimationFrame(cb)
@@ -277,7 +272,7 @@ const loop = new RenderLoop(
       return
     }
 
-    if (settings.sourceMode.value === SOURCES.CAMERA) {
+    if (settings.get('sourceMode') === SOURCES.CAMERA) {
       camera.cancelFrame(handle)
     } else {
       cancelAnimationFrame(handle)
@@ -287,7 +282,7 @@ const loop = new RenderLoop(
 
 async function render () {
   let source
-  const mode = settings.sourceMode.value
+  const mode = settings.get('sourceMode')
 
   if (mode === SOURCES.CAMERA) {
     source = camera.getExternalTexture(gpu.device)
@@ -304,7 +299,7 @@ async function render () {
     generator.draw()
     source = generator.canvas
   } else if (mode === SOURCES.IMAGE) {
-    source = imageCache.get(settings.currentImage.value)
+    source = imageCache.get(settings.get('currentImage'))
     if (!source) {
       source = imageCache.black
     }
@@ -354,22 +349,16 @@ async function init () {
 }
 
 function renderPatternOptions () {
-  const patternOptions = Object.keys(Generators).map(name => {
-    const opt = document.createElement('option')
-    opt.value = name
-    opt.textContent = name
-    return opt
-  })
-  settings.currentPattern.el.replaceChildren(...patternOptions)
-  settings.currentPattern.refreshElValue()
+    const patternOptions = Object.keys(Generators).map(name => new Option(name, name))
+    settings.setOptions('currentPattern', patternOptions)
 }
 
 async function refreshCameraOptions () {
   const devices = await camera.getDevices()
   const deviceOptions = devices
     .map(({ deviceId, label }) => new Option(label || 'Camera', deviceId))
-  settings.deviceId.el.replaceChildren(...deviceOptions)
-  settings.deviceId.refreshElValue()
+
+  settings.setOptions('deviceId', deviceOptions)
 }
 
 function refreshImageOptions () {
@@ -381,20 +370,18 @@ function refreshImageOptions () {
   const names = imageCache.names
   const imageOptions = names.map(name => new Option(name, name))
 
-  const imageSelect = settings.currentImage.el
-
-  imageSelect.replaceChildren(placeholder, separator, ...imageOptions)
+  settings.setOptions('currentImage', [placeholder, separator, ...imageOptions])
 
   if (names.length > 0) {
-    imageSelect.value = names.at(-1)
-    imageSelect.dispatchEvent(new Event('change'))
+    const value = names.at(-1)
+    settings.set('currentImage', value)
   } else {
-    imageSelect.selectedIndex = 0
+    settings.set('currentImage', "")
   }
 }
 
 function warnIfImageModeAndNoImages () {
-  if (settings.sourceMode.value === SOURCES.IMAGE) {
+  if (settings.get('sourceMode') === SOURCES.IMAGE) {
     const size = imageCache.size
     if (size < 1) {
       elements.noImages.classList.remove('hidden')
@@ -406,62 +393,12 @@ function warnIfImageModeAndNoImages () {
 }
 
 async function initSettings () {
-  for (const cfg of Object.values(settings)) {
-    const saved = cfg.storageKey ? localStorage.getItem(cfg.storageKey) : null
-
-    let val = cfg.default
-    if (saved !== null) {
-      if (typeof cfg.default === 'boolean') {
-        val = saved === 'true'
-      } else if (typeof cfg.default === 'number') {
-        val = parseFloat(saved)
-      } else {
-        val = saved
-      }
+  for (const [key, config] of Object.entries(SETTING_DESCRIPTORS)) {
+    // TODO this is a temporary change pending a larger refactor
+    if (config.onchange) {
+      settings.subscribe(key, config.onchange)
     }
-
-    cfg.store = (value) => {
-      cfg.value = value
-      if (cfg.storageKey) {
-        localStorage.setItem(cfg.storageKey, value)
-      }
-    }
-
-    cfg.value = val
-
-    if (cfg.el) {
-      const isCheckbox = cfg.el.type === 'checkbox'
-      cfg.refreshElValue = () => {
-        const uiVal = cfg.toUI ? cfg.toUI(cfg.value) : cfg.value
-
-        if (cfg.setElValue) {
-          cfg.setElValue(uiVal)
-        }
-        else if (isCheckbox) {
-          cfg.el.checked = uiVal
-        } else {
-          cfg.el.value = uiVal
-        }
-      }
-
-      cfg.refreshElValue()
-      cfg.el.addEventListener(isCheckbox ? 'click' : 'change', (e) => {
-        const raw = isCheckbox ? e.target.checked : e.target.value
-        const final = cfg.fromUI ? cfg.fromUI(raw) : raw
-
-        cfg.store(final)
-
-        if (cfg.onchange) {
-          cfg.onchange(final, e)
-        }
-      })
-    }
-  }
-
-  for (const cfg of Object.values(settings)) {
-    if (cfg.onchange) {
-      await cfg.onchange(cfg.value)
-    }
+    settings.addSetting(key, config)
   }
 }
 
@@ -527,8 +464,8 @@ function setupDragAndDrop () {
 
     await Promise.all(files.map(file => imageCache.add(file)))
     refreshImageOptions()
-    settings.sourceMode.el.value = "image"
-    settings.sourceMode.el.dispatchEvent(new Event('change'))
+    SETTING_DESCRIPTORS.sourceMode.el.value = "image"
+    SETTING_DESCRIPTORS.sourceMode.el.dispatchEvent(new Event('change'))
     warnIfImageModeAndNoImages()
   })
 }
