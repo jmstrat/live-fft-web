@@ -54,7 +54,7 @@ const elements = {
   loading: document.getElementById('loading-overlay')
 }
 
-async function render () {
+function render () {
   const frame = sources.getFrame(renderer.gpu.device)
   if (frame) {
     renderer.render(frame)
@@ -62,18 +62,14 @@ async function render () {
 }
 
 async function init () {
-  canvases.input.width = canvases.input.height = SIZE
-  canvases.magnitude.width = canvases.magnitude.height = SIZE
-  canvases.phase.width = canvases.phase.height = SIZE
-  canvases.integration.width = SIZE * 2
-  canvases.integration.height = SIZE / 2
-
   try {
+    setCanvasSizes()
     await initialiseRenderer()
     await initialiseSources()
-    await initSettings()
 
+    addMainSettings()
     setupFullscreen()
+
     sources.startLoop(render)
   } catch (err) {
     showError(err)
@@ -81,6 +77,16 @@ async function init () {
   } finally {
     elements.loading.classList.add('hidden')
   }
+}
+
+function setCanvasSizes () {
+  const { integration, ...squareCanvases } = canvases
+  for (const c of Object.values(squareCanvases)) {
+    c.width = c.height = SIZE
+  }
+
+  integration.width = SIZE * 2
+  integration.height = SIZE / 2
 }
 
 async function initialiseRenderer () {
@@ -113,7 +119,7 @@ async function initialiseSources () {
 
   sources.addEventListener(SourceManager.events.activate,
     ({ detail: { name } }) => {
-      settings.set('sourceMode', name)
+      settings.set(SETTINGS.SOURCE, name)
       hideError()
     }
   )
@@ -128,7 +134,7 @@ async function initialiseSources () {
   await sources.register(SOURCES.IMAGE, image, SIZE)
 }
 
-async function initSettings () {
+function addMainSettings () {
   settings.subscribe(SETTINGS.SOURCE, async (mode) => {
     await sources.setActive(mode)
   })
@@ -166,8 +172,6 @@ function setupFullscreen () {
   })
 }
 
-init()
-
 // Workaround for Safari bug:
 // In a popover positioned with position-anchor, the OS native picker window
 // is not positioned correctly unless the input is focused before the click
@@ -182,3 +186,5 @@ document.addEventListener('mousedown', (e) => {
     void e.target.offsetWidth
   }
 }, { capture: true })
+
+init()
