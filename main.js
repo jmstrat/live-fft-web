@@ -1,5 +1,5 @@
 import { SettingsManager } from './settings.js'
-import { FFTWebGPU } from './gpu.js'
+import { Renderer } from './Render/render.js'
 
 import { SourceManager } from './Sources/manager.js'
 import { CameraSource } from './Sources/Camera/camera-source.js'
@@ -12,7 +12,7 @@ const SIZE = 512 // Must be a power of RADIX (default 2)
 
 const settings = new SettingsManager()
 const sources = new SourceManager()
-const gpu = new FFTWebGPU()
+const renderer = new Renderer(settings)
 
 const SOURCES = {
   CAMERA: 'camera',
@@ -20,165 +20,56 @@ const SOURCES = {
   IMAGE: 'image'
 }
 
+const SETTINGS = {
+  SOURCE: 'sourceMode',
+  LIGHT_DARK: 'lightDark'
+}
+
 const SETTING_DESCRIPTORS = {
-  sourceMode: {
+  [SETTINGS.SOURCE]: {
     el: document.getElementById('source-select'),
     storageKey: 'source',
-    default: SOURCES.GENERATOR,
-    onchange: async (mode) => {
-      await sources.setActive(mode)
-    }
+    default: SOURCES.GENERATOR
   },
-  // Input
-  inputDisplay: {
-    el: document.getElementById('input-display-select'),
-    storageKey: 'input-display-mode',
-    default: 'processed',
-    onchange: (v) => {
-      gpu.setInputTextureDisplayMode(FFTWebGPU.InputDisplayMode[v])
-      sources.requestNewFrame()
-    }
-  },
-  convertOption: {
-    el: document.getElementById('input-convert-select'),
-    storageKey: 'convert',
-    default: 'PeriodicPlusSmooth',
-    onchange: (v) => {
-      gpu.setInputTextureConvertMethod(FFTWebGPU.InputConversionMode[v])
-      sources.requestNewFrame()
-    }
-  },
-  flipX: {
-    el: document.getElementById('flip-x-checkbox'),
-    storageKey: 'flip-x',
-    default: false,
-    onchange: (v) => {
-      gpu.setFlipX(v)
-      sources.requestNewFrame()
-    }
-  },
-
-  // Output
-  displayPhase: {
-    el: document.getElementById('phase-checkbox'),
-    storageKey: 'display-phase',
-    default: false,
-    onchange: (v) => {
-      if (v) {
-        elements.dashboard.classList.add('col-3')
-        elements.phase.classList.remove('hidden')
-        gpu.setRenderPhase(true)
-      } else {
-        elements.dashboard.classList.remove('col-3')
-        elements.phase.classList.add('hidden')
-        gpu.setRenderPhase(false)
-      }
-
-      sources.requestNewFrame()
-    }
-  },
-  magnitudeColourMap: {
-    el: document.getElementById('magnitude-colourmap-select'),
-    storageKey: 'mag-colour-map',
-    default: 'Viridis',
-    onchange: (v) => {
-      gpu.setMagnitudeColourMap(FFTWebGPU.MagnitudeColourMap[v])
-      sources.requestNewFrame()
-    }
-  },
-  phaseColourMap: {
-    el: document.getElementById('phase-colourmap-select'),
-    storageKey: 'phase-colour-map',
-    default: 'Roma',
-    onchange: (v) => {
-      gpu.setPhaseColourMap(FFTWebGPU.PhaseColourMap[v])
-      sources.requestNewFrame()
-    }
-  },
-  intensityScale: {
-    el: document.getElementById('intensity-range'),
-    storageKey: 'intensity-scale',
-    default: 0.25,
-    toUI: (v) => v * 100,
-    fromUI: (v) => v / 100,
-    onchange: (v) => {
-      gpu.setMagnitudeScale(v)
-      sources.requestNewFrame()
-    }
-  },
-
-  lightDark:  {
+  [SETTINGS.LIGHT_DARK]: {
     el: document.getElementById('theme-switcher'),
     storageKey: 'theme',
     default: 'auto',
-    onchange: (v) => {
-      const isLight = v === 'light'
-      document.body.classList.toggle('light-mode', isLight)
-      const white = [ 1, 1, 1, 1 ]
-      const black = [ 0, 0, 0, 1 ]
-      gpu.setIntegrationPalette(isLight ? { fg: black, bg: white } : { fg: white, bg: black })
-
-      const styles = getComputedStyle(document.body)
-      const bgColour = styles.getPropertyValue('--bg-colour').trim()
-      let activeMeta = document.querySelector("meta[name='theme-color']:not([media])")
-      if (!activeMeta) {
-        activeMeta = document.createElement('meta')
-        activeMeta.name = "theme-color"
-        document.head.appendChild(activeMeta)
-      }
-      activeMeta.setAttribute("content", bgColour)
+    parse (_, el) {
+      return el.resolvedValue
     }
   }
 }
 
-const elements = {
-  dashboard: document.getElementById('dashboard'),
-  // Canvases
+const canvases = {
   input: document.getElementById('input-canvas'),
   magnitude: document.getElementById('fft-magnitude'),
   phase: document.getElementById('fft-phase'),
-  integration: document.getElementById('integration-canvas'),
+  integration: document.getElementById('integration-canvas')
+}
 
-  // Input sections
-  camSection: document.getElementById('camera-section'),
-  genSection: document.getElementById('generator-section'),
-  imageSection: document.getElementById('image-section'),
-
-  // Buttons
+const elements = {
+  dashboard: document.getElementById('dashboard'),
   fullscreenBtn: document.getElementById('fullscreen-btn'),
-
-  // Overlays
-  loading: document.getElementById('loading-overlay'),
-  noImages: document.getElementById('no-images-overlay'),
-  drop: document.getElementById('drop-overlay'),
-  errorOverlay: document.getElementById('error-overlay'),
-  errorTitle: document.getElementById('error-title'),
-  errorMsg: document.getElementById('error-message'),
-  errorCode: document.getElementById('error-code')
+  loading: document.getElementById('loading-overlay')
 }
 
 async function render () {
-  const frame = sources.getFrame(gpu.device)
-  gpu.render(frame)
+  const frame = sources.getFrame(renderer.gpu.device)
+  if (frame) {
+    renderer.render(frame)
+  }
 }
 
 async function init () {
-  elements.input.width = elements.input.height = SIZE
-  elements.magnitude.width = elements.magnitude.height = SIZE
-  elements.phase.width = elements.phase.height = SIZE
-  elements.integration.width = SIZE * 2
-  elements.integration.height = SIZE / 2
+  canvases.input.width = canvases.input.height = SIZE
+  canvases.magnitude.width = canvases.magnitude.height = SIZE
+  canvases.phase.width = canvases.phase.height = SIZE
+  canvases.integration.width = SIZE * 2
+  canvases.integration.height = SIZE / 2
 
   try {
-    await gpu.init(
-      {
-        input: elements.input,
-        magnitude: elements.magnitude,
-        phase: elements.phase,
-        integration: elements.integration
-      },
-      SIZE
-    )
+    await initialiseRenderer()
     await initialiseSources()
     await initSettings()
 
@@ -190,6 +81,23 @@ async function init () {
   } finally {
     elements.loading.classList.add('hidden')
   }
+}
+
+async function initialiseRenderer () {
+  renderer.addEventListener(Renderer.events.dirty, () => sources.requestNewFrame())
+  renderer.addEventListener(Renderer.events.canvasActive, (e) => {
+    const { canvas, active } = e.detail
+    const el = canvases[canvas]
+    if (el) {
+      el.classList.toggle('hidden', !active)
+      // Note that currently we only ever toggle the phase canvas
+      // If we want to toggle other canvases we need to make the
+      // dashboard more flexible
+      elements.dashboard.classList.toggle('col-3', active)
+    }
+  })
+
+  await renderer.init(canvases, SIZE)
 }
 
 async function initialiseSources () {
@@ -221,11 +129,25 @@ async function initialiseSources () {
 }
 
 async function initSettings () {
-  for (const [key, config] of Object.entries(SETTING_DESCRIPTORS)) {
-    // TODO this is a temporary change pending a larger refactor
-    if (config.onchange) {
-      settings.subscribe(key, config.onchange)
+  settings.subscribe(SETTINGS.SOURCE, async (mode) => {
+    await sources.setActive(mode)
+  })
+
+  settings.subscribe(SETTINGS.LIGHT_DARK, (value) => {
+    document.body.classList.toggle('light-mode', value === 'light')
+
+    const styles = getComputedStyle(document.body)
+    const bgColour = styles.getPropertyValue('--bg-colour').trim()
+    let activeMeta = document.querySelector("meta[name='theme-color']:not([media])")
+    if (!activeMeta) {
+      activeMeta = document.createElement('meta')
+      activeMeta.name = "theme-color"
+      document.head.appendChild(activeMeta)
     }
+    activeMeta.setAttribute("content", bgColour)
+  })
+
+  for (const [key, config] of Object.entries(SETTING_DESCRIPTORS)) {
     settings.addSetting(key, config)
   }
 }

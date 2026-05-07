@@ -13,6 +13,12 @@ import {
 
 export class FFTWebGPU {
 
+  static errorCodes = {
+    Unavailable: 'WEBGPU_MISSING',
+    AdapterMissing: 'WEBGPU_ADAPTER_MISSING',
+    LimitsUnsupported: 'LIMITS_UNSUPPORTED'
+  }
+
   static InputDisplayMode = {
     raw: 'raw',
     processed: 'processed'
@@ -75,14 +81,14 @@ export class FFTWebGPU {
   async #getDevice () {
     if (!navigator.gpu) {
       const err = new Error('WebGPU not supported')
-      err.code = 'WEBGPU_MISSING'
+      err.code = FFTWebGPU.errorCodes.Unavailable
       throw err
     }
 
     this.adapter = await navigator.gpu.requestAdapter()
     if (!this.adapter) {
       const err = new Error("No WebGPU adapter found")
-      err.code = 'WEBGPU_ADAPTER_MISSING'
+      err.code = FFTWebGPU.errorCodes.AdapterMissing
       throw err
     }
 
@@ -101,7 +107,7 @@ export class FFTWebGPU {
       })
     } catch (err) {
       const wrapped = new Error('WebGPU limits unsupported', { cause: err })
-      wrapped.code = 'LIMITS_UNSUPPORTED'
+      wrapped.code = FFTWebGPU.errorCodes.LimitsUnsupported
       throw wrapped
     }
   }

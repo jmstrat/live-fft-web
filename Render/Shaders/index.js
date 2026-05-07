@@ -96,7 +96,7 @@ class Shader {
   }
 
   async fetchShaderModule () {
-    const response = await fetch(`Shaders/${this.constructor.filename}`)
+    const response = await fetch(`Render/Shaders/${this.constructor.filename}`)
     const code = await response.text()
     return this.compileShader(code)
   }

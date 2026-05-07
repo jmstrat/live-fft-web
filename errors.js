@@ -1,4 +1,5 @@
 import { Camera } from "./Sources/Camera/adapter.js"
+import { FFTWebGPU } from "./Render/WebGPU.js"
 
 const elements = {
   overlay: document.getElementById('error-overlay'),
@@ -15,22 +16,17 @@ export function showError (err) {
   let modal = true
 
   switch (err.code || err.name) {
-    case 'WEBGPU_MISSING':
+    case FFTWebGPU.errorCodes.Unavailable:
       title = "Browser Update Required"
       message = "Your browser doesn't support WebGPU. Try updating to a newer version."
       break
-    case 'WEBGPU_ADAPTER_MISSING':
+    case FFTWebGPU.errorCodes.AdapterMissing:
       title = "Graphics Card Issue"
       message = "We couldn't find a compatible graphics card. Make sure your drivers are up to date."
       break
-    case 'LIMITS_UNSUPPORTED':
+    case FFTWebGPU.errorCodes.LimitsUnsupported:
       title = "Hardware Unsupported"
       message = "Your GPU may not be powerful enough to run at this resolution."
-      break
-    case 'OverconstrainedError':
-      title = "Camera Error"
-      message = "Unable to capture images from your camera at the required resolution."
-      modal = false
       break
     case Camera.errorCodes.PermissionDenied:
     case Camera.errorCodes.PermissionRevoked:
