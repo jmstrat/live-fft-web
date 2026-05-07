@@ -1,0 +1,16 @@
+# Environment secrets
+.env
+.env.local
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE/Editor folders
+.vscode/
+.idea/
+
+# Temp files
+*.log
+temp/
