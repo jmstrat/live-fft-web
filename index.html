@@ -16,20 +16,34 @@
 
   <link rel="modulepreload" href="./components/theme-selector/index.js">
   <link rel="modulepreload" href="main.js">
-  <link rel="modulepreload" href="gpu.js">
-  <link rel="modulepreload" href="Shaders/index.js">
-  <link rel="modulepreload" href="camera.js">
-  <link rel="modulepreload" href="generators.js">
-  <link rel="modulepreload" href="image-cache.js">
-  <link rel="modulepreload" href="render-loop.js">
+  <link rel="modulepreload" href="settings.js">
+  <link rel="modulepreload" href="errors.js">
+  <link rel="modulepreload" href="Render/render.js">
+  <link rel="modulepreload" href="Render/Shaders/index.js">
+  <link rel="modulepreload" href="Render/WebGPU.js">
 
-  <link rel="preload" as="fetch" crossorigin href="Shaders/convert.wgsl">
-  <link rel="preload" as="fetch" crossorigin href="Shaders/fft-stockham.wgsl">
-  <link rel="preload" as="fetch" crossorigin href="Shaders/integrate.wgsl">
-  <link rel="preload" as="fetch" crossorigin href="Shaders/magnitude.wgsl">
-  <link rel="preload" as="fetch" crossorigin href="Shaders/periodic-plus-smooth.wgsl">
-  <link rel="preload" as="fetch" crossorigin href="Shaders/render-ft.wgsl">
-  <link rel="preload" as="fetch" crossorigin href="Shaders/render-plot.wgsl">
+  <link rel="modulepreload" href="Sources/manager.js">
+  <link rel="modulepreload" href="Sources/source.js">
+  <link rel="modulepreload" href="Sources/render-loop.js">
+
+  <link rel="modulepreload" href="Sources/Camera/camera-source.js">
+  <link rel="modulepreload" href="Sources/Camera/adapter.js">
+
+  <link rel="modulepreload" href="Sources/Canvas/canvas-source.js">
+  <link rel="modulepreload" href="Sources/Canvas/generators.js">
+
+  <link rel="modulepreload" href="Sources/Image/image-source.js">
+  <link rel="modulepreload" href="Sources/Image/cache.js">
+  <link rel="modulepreload" href="Sources/Image/drag-and-drop.js">
+
+
+  <link rel="preload" as="fetch" crossorigin href="Render/Shaders/convert.wgsl">
+  <link rel="preload" as="fetch" crossorigin href="Render/Shaders/fft-stockham.wgsl">
+  <link rel="preload" as="fetch" crossorigin href="Render/Shaders/integrate.wgsl">
+  <link rel="preload" as="fetch" crossorigin href="Render/Shaders/magnitude.wgsl">
+  <link rel="preload" as="fetch" crossorigin href="Render/Shaders/periodic-plus-smooth.wgsl">
+  <link rel="preload" as="fetch" crossorigin href="Render/Shaders/render-ft.wgsl">
+  <link rel="preload" as="fetch" crossorigin href="Render/Shaders/render-plot.wgsl">
 
   <link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96"/>
   <link rel="icon" type="image/svg+xml" href="favicon/favicon.svg"/>
