@@ -25,8 +25,6 @@ initGenerators(SIZE, SIZE)
 let isReady = false
 let lastDrawnImage = null
 
-const darkQuery = window.matchMedia('(prefers-color-scheme: dark)')
-
 const SOURCES = {
   CAMERA: 'camera',
   GENERATOR: 'generator',
@@ -201,7 +199,7 @@ const settings = {
     storageKey: 'theme',
     default: 'auto',
     onchange: (v, e) => {
-      const isLight = v === 'auto' ? !darkQuery.matches : v === 'light'
+      const isLight = v === 'light'
       document.body.classList.toggle('light-mode', isLight)
       const white = [ 1, 1, 1, 1 ]
       const black = [ 0, 0, 0, 1 ]
@@ -230,19 +228,9 @@ const settings = {
       if (!e.target.matches(':focus-visible')) {
         e.target.blur()
       }
-    },
-    setElValue: (v) => {
-      const input = settings.lightDark.el.querySelector(`input[value="${v}"]`)
-      if (input) {
-        input.checked = true
-      }
     }
   }
 }
-
-darkQuery.addEventListener('change', (e) => {
-  settings.lightDark.onchange(settings.lightDark.value)
-})
 
 const elements = {
   dashboard: document.getElementById('dashboard'),
