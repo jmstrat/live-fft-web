@@ -11,17 +11,9 @@ export class SettingsManager {
   addSetting (key, config) {
     this.#configs[key] = config
 
-    const saved = config.storageKey
-      ? this.storage.getItem(config.storageKey)
-      : null
-
-    const value = this.#initialValue(config, saved)
+    const value = this.#initialValue(config)
 
     this.#values[key] = value
-
-    if (config.storageKey) {
-      this.storage.setItem(config.storageKey, value)
-    }
 
     if (config.el) {
       this.#bindElement(key, config)
@@ -136,9 +128,7 @@ export class SettingsManager {
 
     const el = config.el
 
-    const formatted = config.format
-      ? config.format(value, el)
-      : value
+    const formatted = config.format ? config.format(value, el) : value
 
     const type = config.type || el.type
     if (type === 'checkbox') {
@@ -148,9 +138,13 @@ export class SettingsManager {
     }
   }
 
-  #initialValue (config, saved) {
+  #initialValue (config) {
+    const saved = config.storageKey
+      ? this.storage.getItem(config.storageKey)
+      : null
+
     if (saved === null || saved === undefined) {
-      return config.default
+      return config.format ? config.format(config.default) : config.default
     }
 
     if (typeof config.default === 'boolean') {
