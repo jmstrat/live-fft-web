@@ -44,7 +44,7 @@ const SETTING_DESCRIPTORS = {
 const canvases = {
   input: document.getElementById('input-canvas'),
   magnitude: document.getElementById('fft-magnitude'),
-  phase: document.getElementById('fft-phase'),
+  additional: document.getElementById('fft-extra'),
   integration: document.getElementById('integration-canvas')
 }
 
@@ -96,7 +96,7 @@ async function initialiseRenderer () {
     const el = canvases[canvas]
     if (el) {
       el.classList.toggle('hidden', !active)
-      // Note that currently we only ever toggle the phase canvas
+      // Note that currently we only ever toggle the extra canvas
       // If we want to toggle other canvases we need to make the
       // dashboard more flexible
       elements.dashboard.classList.toggle('col-3', active)

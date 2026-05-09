@@ -1,9 +1,3 @@
-// TODO move the render() function into here
-// Make .gpu global (shader setup etc.)
-// make renderer just the render function
-// This file can be Forward2DFFT()
-// idea would be to allow easily swapping render workflows
-
 import { FFTWebGPU } from './WebGPU.js'
 
 const settings = {
@@ -22,10 +16,10 @@ const settings = {
     storageKey: 'flip-x',
     default: false
   },
-  displayPhase: {
-    el: document.getElementById('phase-checkbox'),
-    storageKey: 'display-phase',
-    default: false
+  additionalOutput: {
+    el: document.getElementById('additional-output-select'),
+    storageKey: 'additional-output',
+    default: 'None'
   },
   magnitudeColourMap: {
     el: document.getElementById('magnitude-colourmap-select'),
@@ -43,6 +37,12 @@ const settings = {
     default: 0.25,
     format: (v) => v * 100,
     parse: (v) => v / 100
+  },
+  maskRange: {
+    el: document.getElementById('ft-mask-range'),
+    default: [0, 1],
+    format: (v) => v.map(x => x * 100),
+    parse: (v) => v.map(x => x / 100)
   }
 }
 
@@ -80,6 +80,7 @@ export class Renderer extends EventTarget {
   }
 
   async init (canvases, size) {
+    this.canvases = canvases
     await this.gpu.init(canvases, size)
     this.#subscribeToSettingsChanges()
     this.#addSettings()
@@ -112,9 +113,37 @@ export class Renderer extends EventTarget {
       this.#emitDirty()
     })
 
-    this.settings.subscribe('displayPhase', (bool) => {
-      this.#markCanvasActive('phase', bool)
-      this.gpu.setRenderPhase(bool)
+    this.settings.subscribe('additionalOutput', (key) => {
+      this.gpu.setRenderPhase(key === 'Phase')
+
+      if (key === 'Inverse') {
+        this.gpu.setRenderInverse(true)
+        settings.maskRange.el.classList.remove('hidden')
+        this.gpu.setMaskEnabled(true)
+        this.gpu.setMaskWindow(FFTWebGPU.MaskWindows.HannWindow)
+      } else {
+        this.gpu.setRenderInverse(false)
+        this.gpu.setMaskEnabled(false)
+        settings.maskRange.el.classList.add('hidden')
+      }
+
+      // Update accessibility attributes
+      if (key !== 'None') {
+        const canvas = this.canvases.additional
+        const labels = canvas.querySelectorAll('p')
+        for (const el of labels) {
+          if (el.id === key) {
+            el.classList.remove('hidden')
+            const title = el.getAttribute('data-title')
+            canvas.title = title
+            canvas.setAttribute('aria-label', title)
+          } else {
+            el.classList.add('hidden')
+          }
+        }
+      }
+
+      this.#markCanvasActive('additional', key !== 'None')
       this.#emitDirty()
     })
 
@@ -130,6 +159,11 @@ export class Renderer extends EventTarget {
 
     this.settings.subscribe('intensityScale', (v) => {
       this.gpu.setMagnitudeScale(v)
+      this.#emitDirty()
+    })
+
+    this.settings.subscribe('maskRange', (val) => {
+      this.gpu.setMaskRadii(...val)
       this.#emitDirty()
     })
 

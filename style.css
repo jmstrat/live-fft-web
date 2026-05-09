@@ -94,6 +94,25 @@ body {
   box-sizing: border-box;
 }
 
+#fft-magnitude {
+  anchor-name: --anchor-magnitude;
+}
+
+.ft-mask-range {
+  position: absolute;
+  position-anchor: --anchor-magnitude;
+
+  width: calc(anchor-size(width) - 2 * var(--margin));
+  left: calc(anchor(left) + var(--margin));
+  bottom: calc(anchor(bottom) + var(--margin));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+main:hover ~.ft-mask-range, .ft-mask-range:hover, .ft-mask-range:active {
+  opacity: 1;
+}
+
 .buttons-container {
   position: fixed;
   top: var(--margin);

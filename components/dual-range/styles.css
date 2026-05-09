@@ -1,0 +1,135 @@
+:host {
+  --range-height: 1.5rem;
+
+  --range-track-height: 0.25rem;
+  --range-track-border-radius: 1rem;
+
+  --range-thumb-width: 1.25rem;
+  --range-thumb-height: 1.25rem;
+  --range-thumb-border-radius: 1rem;
+  --range-thumb-border-width: 1px;
+
+  --range-thumb-colour: var(--accent-colour, #007bff);
+  --range-thumb-hover-colour: var(--accent-colour, #007bff);
+  --range-thumb-active-colour: var(--accent-colour, #007bff);
+  --range-thumb-border-colour: rgba(0, 0, 0, 0.1);
+  --range-thumb-border-hover-colour: var(--range-thumb-border-colour);
+  --range-thumb-border-active-colour: var(--range-thumb-border-colour);
+
+  --range-track-colour: var(--input-bg, #2c313a);
+  --range-track-filled-colour: var(--accent-colour, #007bff);
+  --range-track-filled-gradient-mid-colour: var(--range-track-filled-colour);
+  --range-track-filled-gradient-end-colour: var(--range-track-filled-colour);
+
+  display: flex;
+  height: var(--range-height);
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  padding-inline-end: calc(var(--range-thumb-width) * 2);
+}
+
+:host(:focus-within) {
+  outline: 2px solid var(--range-thumb-active-colour);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+:host([dir="rtl"]) {
+  --dir: -1;
+}
+
+input {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  background: none;
+  border-radius: 0;
+  flex-basis: calc(50% + var(--range-thumb-width));
+  flex-shrink: 0;
+  font-size: inherit;
+  height: 100%;
+  margin: 0;
+  min-width: var(--range-thumb-width);
+  outline: none;
+  cursor: pointer;
+
+  &::-webkit-slider-runnable-track {
+    background-color: var(--range-track-colour);
+    height: var(--range-track-height);
+    box-sizing: border-box;
+  }
+  &::-moz-range-track {
+    background-color: var(--range-track-colour);
+    height: var(--range-track-height);
+    box-sizing: border-box;
+  }
+
+  /* Min Input (First Child) Track */
+  &:first-child {
+    &::-webkit-slider-runnable-track, &::-moz-range-track {
+      border-start-start-radius: var(--range-track-border-radius);
+      border-end-start-radius: var(--range-track-border-radius);
+      background-image: linear-gradient(
+        calc(90deg * var(--dir, 1)),
+        var(--range-track-colour) var(--range-gradient-position),
+        var(--range-track-filled-colour) var(--range-gradient-position),
+        var(--range-track-filled-gradient-mid-colour)
+      );
+    }
+  }
+
+  /* Max Input (Last Child) Track */
+  &:last-child {
+    &::-webkit-slider-runnable-track, &::-moz-range-track {
+      border-start-end-radius: var(--range-track-border-radius);
+      border-end-end-radius: var(--range-track-border-radius);
+      background-image: linear-gradient(
+        calc(90deg * var(--dir, 1)),
+        var(--range-track-filled-gradient-mid-colour),
+        var(--range-track-filled-gradient-end-colour) var(--range-gradient-position),
+        var(--range-track-colour) var(--range-gradient-position)
+      );
+    }
+  }
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    background-color: var(--range-thumb-colour);
+    border-radius: var(--range-thumb-border-radius);
+    border: var(--range-thumb-border-width) solid var(--range-thumb-border-colour);
+    height: var(--range-thumb-height);
+    width: var(--range-thumb-width);
+    margin-top: calc(var(--range-track-height) / 2);
+    transform: translateY(-50%);
+  }
+
+  &::-moz-range-thumb {
+    appearance: none;
+    background-color: var(--range-thumb-colour);
+    border-radius: var(--range-thumb-border-radius);
+    border: var(--range-thumb-border-width) solid var(--range-thumb-border-colour);
+    height: var(--range-thumb-height);
+    width: var(--range-thumb-width);
+    max-width: 99.99%;
+  }
+
+  &:hover, &:active, &:focus-visible {
+    &::-webkit-slider-thumb {
+      background-color: var(--range-thumb-hover-colour);
+      border-color: var(--range-thumb-border-hover-colour);
+    }
+    &::-moz-range-thumb {
+      background-color: var(--range-thumb-hover-colour);
+      border-color: var(--range-thumb-border-hover-colour);
+    }
+  }
+
+  &:active, &:focus-visible {
+    &::-webkit-slider-thumb, &::-moz-range-thumb {
+      background-color: var(--range-thumb-active-colour);
+      border-color: var(--range-thumb-border-active-colour);
+    }
+  }
+}

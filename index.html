@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="style.css">
 
   <link rel="modulepreload" href="./components/theme-selector/index.js">
+  <link rel="modulepreload" href="./components/dual-range/index.js">
   <link rel="modulepreload" href="main.js">
   <link rel="modulepreload" href="settings.js">
   <link rel="modulepreload" href="errors.js">
@@ -37,6 +38,7 @@
   <link rel="modulepreload" href="Sources/Image/drag-and-drop.js">
 
   <link rel="preload" href="components/theme-selector/styles.css" as="fetch" crossorigin>
+  <link rel="preload" href="components/dual-range/styles.css" as="fetch" crossorigin>
 
   <link rel="preload" as="fetch" crossorigin href="Render/Shaders/convert.wgsl">
   <link rel="preload" as="fetch" crossorigin href="Render/Shaders/fft-stockham.wgsl">
@@ -68,10 +70,12 @@
         aria-label="Fourier transform magnitude" role="img">
           <p>Live visualization of the magnitude of the input signal after Fourier transformation.</p>
       </canvas>
-      <canvas id="fft-phase" class="output right hidden"
-        title="Fourier transform phase"
-        aria-label="Fourier transform phase" role="img">
-          <p>Live visualization of the phase of the input signal after Fourier transformation.</p>
+      <canvas id="fft-extra" class="output right hidden"
+        role="img"
+        aria-labelled="Additional Output (tbd)"
+        title="Additional Output (tbd)">
+          <p id="Phase" data-title="Fourier transform phase">Live visualization of the phase of the input signal.</p>
+          <p id="Inverse" data-title="Inverse Fourier transform">Inverse of the Fourier transform.</p>
       </canvas>
     </div>
     <div class="row">
@@ -82,6 +86,14 @@
       </canvas>
     </div>
   </main>
+
+  <dual-range-input id="ft-mask-range" class="ft-mask-range"
+  title="Mask Range">
+    <template shadowrootmode="open">
+      <input type="range" min="0" max="100" step="1" value="25" id="min" />
+      <input type="range" min="0" max="100" step="1" value="75" id="max" />
+    </template>
+  </dual-range-input>
 
   <div class="buttons-container">
     <div id="settings-btn" class="btn-wrapper">
@@ -216,8 +228,12 @@
     </section>
 
     <section>
-      <label for="phase-checkbox">Display Phase</label>
-      <input type="checkbox" id="phase-checkbox"/>
+      <label for="additional-output-select">Additional Output</label>
+      <select id="additional-output-select">
+        <option selected value="None">None</option>
+        <option value="Phase">Phase</option>
+        <option value="Inverse">Inverse FT with Mask</option>
+      </select>
     </section>
 
     <section>
@@ -377,5 +393,6 @@
 
   <script type="module" src="main.js"></script>
   <script type="module" src="./components/theme-selector/index.js"></script>
+  <script type="module" src="./components/dual-range/index.js"></script>
 </body>
 </html>

@@ -384,6 +384,65 @@ export class FFTShader extends Shader {
   }
 }
 
+export class MaskShader extends Shader {
+  static filename = 'mask.wgsl'
+
+  static WindowFunctions = {
+    None: 0,
+    HammingWindow: 1,
+    HannWindow: 2,
+    BlackmanWindow: 3,
+    GaussianWindow: 4
+  }
+
+  async init () {
+    const module = await this.fetchShaderModule()
+    this.pipeline = await this.createComputePipeline({
+      layout: 'auto',
+      compute: { module }
+    })
+
+    this.uniformBuffer = this.device.createBuffer({
+      size: 12,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    })
+    this.uniformResource = { buffer: this.uniformBuffer }
+  }
+
+  run (encoder, input, output) {
+    const pipeline = this.pipeline
+    const bindGroup = this.getBindGroup(
+      pipeline,
+      input,
+      output,
+      this.uniformResource
+    )
+
+    const pass = encoder.beginComputePass()
+    pass.setPipeline(pipeline)
+    pass.setBindGroup(0, bindGroup)
+    pass.dispatchWorkgroups(
+      Math.ceil(this.size / 8),
+      Math.ceil(this.size / 8)
+    )
+    pass.end()
+  }
+
+  setWindow (idx) {
+    if (isNaN(idx) || idx < 0) {
+      idx = 0
+    }
+
+    const arr = new Uint32Array([idx])
+    this.device.queue.writeBuffer(this.uniformBuffer, 0, arr)
+  }
+
+  setRadii (min, max) {
+    const arr = new Float32Array([ min, max ])
+    this.device.queue.writeBuffer(this.uniformBuffer, 4, arr)
+  }
+}
+
 export class MagnitudeShader extends Shader {
   static filename = 'magnitude.wgsl'
 

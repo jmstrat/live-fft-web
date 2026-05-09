@@ -2,6 +2,7 @@ import {
   ConvertShader,
   PeriodicPlusSmoothShader,
   FFTShader,
+  MaskShader,
   MagnitudeShader,
   IntegrationShader,
 
@@ -29,14 +30,16 @@ export class FFTWebGPU {
     PeriodicPlusSmooth: Symbol()
   }
 
-
   static MagnitudeColourMap = MagnitudeShader.MagnitudeColourMap
   static PhaseColourMap = MagnitudeShader.PhaseColourMap
+
+  static MaskWindows = MaskShader.WindowFunctions
 
   static shaders = [
     ConvertShader,
     PeriodicPlusSmoothShader,
     FFTShader,
+    MaskShader,
     MagnitudeShader,
     IntegrationShader,
     Float32Downcast,
@@ -47,7 +50,9 @@ export class FFTWebGPU {
 
   #inputDisplayMode = 'raw'
   #periodicPlusSmooth = false
+  #maskEnabled = false
   #renderPhase = false
+  #renderInverse = false
 
   // canvases should be { input, magnitude, phase, integration }
   async init (canvases, size) {
@@ -182,7 +187,7 @@ export class FFTWebGPU {
         'rgba8unorm',
         GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING
       ),
-      outputPhase: this.#createTexture(
+      outputExtra: this.#createTexture(
         'rgba8unorm',
         GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING
       )
@@ -193,7 +198,7 @@ export class FFTWebGPU {
       fft: this.textures.fft.map(x => x.createView()),
       greyscaleCopy: this.textures.greyscaleCopy.createView(),
       outputMagnitude: this.textures.outputMagnitude.createView(),
-      outputPhase: this.textures.outputPhase.createView()
+      outputExtra: this.textures.outputExtra.createView()
     }
   }
 
@@ -204,6 +209,9 @@ export class FFTWebGPU {
   render (source) {
     const encoder = this.device.createCommandEncoder()
     const shaders = this.#shaders
+
+    let ping = 0
+    let pong = 1
 
     if (!(source instanceof GPUExternalTexture)) {
       this.device.queue.copyExternalImageToTexture(
@@ -217,13 +225,13 @@ export class FFTWebGPU {
     shaders.get(ConvertShader).run(
       encoder,
       source,
-      this.views.fft[0]
+      this.views.fft[ping]
     )
 
     if (this.#periodicPlusSmooth) {
       // Backup the greyscale image (I)
       encoder.copyTextureToTexture(
-        { texture: this.textures.fft[0] },
+        { texture: this.textures.fft[ping] },
         { texture: this.textures.greyscaleCopy },
         [this.size, this.size]
       )
@@ -231,7 +239,8 @@ export class FFTWebGPU {
       shaders.get(PeriodicPlusSmoothShader).run(
         encoder,
         this.views.greyscaleCopy,
-        ...this.views.fft
+        this.views.fft[ping],
+        this.views.fft[pong]
       )
     }
 
@@ -246,12 +255,12 @@ export class FFTWebGPU {
       )
     } else {
       const downcast = shaders.get(Float32Downcast)
-      let processedTexture = this.views.fft[0]
+      let processedTexture = this.views.fft[ping]
       if (downcast.active) {
         // Downcast the processed float32 texture to an 8-bit texture
         // Only necessary on older GPUs
-        downcast.run(encoder, this.views.fft[0], this.views.outputPhase)
-        processedTexture = this.views.outputPhase
+        downcast.run(encoder, this.views.fft[ping], this.views.outputExtra)
+        processedTexture = this.views.outputExtra
       }
 
       shaders.get(RenderTextureShader).runGreyscale(
@@ -261,14 +270,26 @@ export class FFTWebGPU {
       )
     }
 
-    shaders.get(FFTShader).run(encoder, ...this.views.fft)
+    shaders.get(FFTShader).run(encoder, this.views.fft[ping], this.views.fft[pong])
+
+    if (this.#maskEnabled) {
+      shaders.get(MaskShader).run(
+        encoder,
+        this.views.fft[ping],
+        this.views.fft[pong]
+      )
+      // Swap buffers (masked data in ping)
+      const x = ping
+      ping = pong
+      pong = x
+    }
 
     shaders.get(MagnitudeShader).run(
       encoder,
-      this.views.fft[0],
-      this.views.fft[1],
+      this.views.fft[ping],
+      this.views.fft[pong],
       this.views.outputMagnitude,
-      this.views.outputPhase
+      this.views.outputExtra
     )
 
     shaders.get(RenderTextureShader).run(
@@ -280,12 +301,12 @@ export class FFTWebGPU {
     if (this.#renderPhase) {
       shaders.get(RenderTextureShader).run(
         encoder,
-        this.views.outputPhase,
-        this.canvases.phase.getCurrentTexture().createView()
+        this.views.outputExtra,
+        this.canvases.additional.getCurrentTexture().createView()
       )
     }
 
-    shaders.get(IntegrationShader).run(encoder, this.views.fft[1])
+    shaders.get(IntegrationShader).run(encoder, this.views.fft[pong])
 
     shaders.get(RenderProfileShader).run(
       encoder,
@@ -293,6 +314,27 @@ export class FFTWebGPU {
       shaders.get(IntegrationShader).global_max,
       this.canvases.integration.getCurrentTexture().createView()
     )
+
+    if (this.#renderInverse && !this.#renderPhase) {
+      shaders.get(FFTShader).runInverse(
+        encoder, this.views.fft[ping], this.views.fft[pong]
+      )
+
+      const downcast = shaders.get(Float32Downcast)
+      let processedTexture = this.views.fft[ping]
+      if (downcast.active) {
+        // Downcast the processed float32 texture to an 8-bit texture
+        // Only necessary on older GPUs
+        downcast.run(encoder, this.views.fft[ping], this.views.outputExtra)
+        processedTexture = this.views.outputExtra
+      }
+
+      shaders.get(RenderTextureShader).runGreyscale(
+        encoder,
+        processedTexture,
+        this.canvases.additional.getCurrentTexture().createView()
+      )
+    }
 
     this.device.queue.submit([encoder.finish()])
   }
@@ -322,6 +364,10 @@ export class FFTWebGPU {
     this.#shaders.get(MagnitudeShader).setCalcPhase(bool)
   }
 
+  setRenderInverse (bool) {
+    this.#renderInverse = bool
+  }
+
   setMagnitudeColourMap (idx) {
     this.#shaders.get(MagnitudeShader).setMagnitudeColourMap(idx)
   }
@@ -332,6 +378,18 @@ export class FFTWebGPU {
 
   setMagnitudeScale (x) {
     this.#shaders.get(MagnitudeShader).setMagnitudeScale(x)
+  }
+
+  setMaskEnabled (bool) {
+    this.#maskEnabled = bool
+  }
+
+  setMaskWindow (idx) {
+    this.#shaders.get(MaskShader).setWindow(idx)
+  }
+
+  setMaskRadii (min, max) {
+    this.#shaders.get(MaskShader).setRadii(min, max)
   }
 
   setIntegrationPalette (pal) {

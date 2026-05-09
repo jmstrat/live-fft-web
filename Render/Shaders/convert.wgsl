@@ -5,7 +5,7 @@
 
 @group(0) @binding(3) var<uniform> params : Params;
 
-const PI: f32 = 3.14159265359;
+const PI: f32 = acos(-1.0);
 
 struct Params {
   window_type: u32,
