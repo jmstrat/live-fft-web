@@ -45,7 +45,8 @@ const canvases = {
   input: document.getElementById('input-canvas'),
   magnitude: document.getElementById('fft-magnitude'),
   additional: document.getElementById('fft-extra'),
-  integration: document.getElementById('integration-canvas')
+  integration: document.getElementById('integration-canvas'),
+  hover: document.getElementById('hover-canvas')
 }
 
 const elements = {

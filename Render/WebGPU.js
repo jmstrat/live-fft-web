@@ -9,7 +9,8 @@ import {
   Float32Downcast,
 
   RenderTextureShader,
-  RenderProfileShader
+  RenderProfileShader,
+  RenderWaveShader
 } from './Shaders/index.js'
 
 export class FFTWebGPU {
@@ -44,7 +45,8 @@ export class FFTWebGPU {
     IntegrationShader,
     Float32Downcast,
     RenderTextureShader,
-    RenderProfileShader
+    RenderProfileShader,
+    RenderWaveShader
   ]
   #shaders = new Map()
 
@@ -53,6 +55,7 @@ export class FFTWebGPU {
   #maskEnabled = false
   #renderPhase = false
   #renderInverse = false
+  #renderWave = false
 
   // canvases should be { input, magnitude, phase, integration }
   async init (canvases, size) {
@@ -272,6 +275,14 @@ export class FFTWebGPU {
 
     shaders.get(FFTShader).run(encoder, this.views.fft[ping], this.views.fft[pong])
 
+    if (this.#renderWave) {
+      shaders.get(RenderWaveShader).run(
+        encoder,
+        this.views.fft[ping],
+        this.canvases.hover.getCurrentTexture().createView()
+      )
+    }
+
     if (this.#maskEnabled) {
       shaders.get(MaskShader).run(
         encoder,
@@ -394,5 +405,13 @@ export class FFTWebGPU {
 
   setIntegrationPalette (pal) {
     this.#shaders.get(RenderProfileShader).setPalette(pal)
+  }
+
+  setRenderWave (bool) {
+    this.#renderWave = bool
+  }
+
+  setWaveCoordinates (x, y) {
+    this.#shaders.get(RenderWaveShader).setFrequencyCoordinate(x, y)
   }
 }

@@ -22,6 +22,7 @@
   <link rel="modulepreload" href="Render/render.js">
   <link rel="modulepreload" href="Render/Shaders/index.js">
   <link rel="modulepreload" href="Render/WebGPU.js">
+  <link rel="modulepreload" href="Render/HoverTracker.js">
 
   <link rel="modulepreload" href="Sources/manager.js">
   <link rel="modulepreload" href="Sources/source.js">
@@ -44,9 +45,11 @@
   <link rel="preload" as="fetch" crossorigin href="Render/Shaders/fft-stockham.wgsl">
   <link rel="preload" as="fetch" crossorigin href="Render/Shaders/integrate.wgsl">
   <link rel="preload" as="fetch" crossorigin href="Render/Shaders/magnitude.wgsl">
+  <link rel="preload" as="fetch" crossorigin href="Render/Shaders/mask.wgsl">
   <link rel="preload" as="fetch" crossorigin href="Render/Shaders/periodic-plus-smooth.wgsl">
   <link rel="preload" as="fetch" crossorigin href="Render/Shaders/render-ft.wgsl">
   <link rel="preload" as="fetch" crossorigin href="Render/Shaders/render-plot.wgsl">
+  <link rel="preload" as="fetch" crossorigin href="Render/Shaders/wave.wgsl">
 
   <link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96"/>
   <link rel="icon" type="image/svg+xml" href="favicon/favicon.svg"/>
@@ -72,7 +75,7 @@
       </canvas>
       <canvas id="fft-extra" class="output right hidden"
         role="img"
-        aria-labelled="Additional Output (tbd)"
+        aria-label="Additional Output (tbd)"
         title="Additional Output (tbd)">
           <p id="Phase" data-title="Fourier transform phase">Live visualization of the phase of the input signal.</p>
           <p id="Inverse" data-title="Inverse Fourier transform">Inverse of the Fourier transform.</p>
@@ -86,6 +89,12 @@
       </canvas>
     </div>
   </main>
+
+  <canvas id="hover-canvas" class="output" popover="manual"
+    title="Fourier transform component"
+    aria-label="Fourier transform component" role="img">
+      <p>A single component of the Fourier transform.</p>
+  </canvas>
 
   <dual-range-input id="ft-mask-range" class="ft-mask-range"
   title="Mask Range">
@@ -133,7 +142,7 @@
       <template shadowrootmode="open">
         <div role="radiogroup" aria-label="Select colour theme">
           <label class="theme-option" title="Light Mode" part="btn">
-            <input type="radio" name="theme" value="light">
+            <input type="radio" name="theme" value="light" aria-label="Light Mode">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
               <circle cx="12" cy="12" r="5"/>
               <path d="M12 3v3M12 18v3M5.64 5.64l2.12 2.12M16.24 16.24l2.12 2.12M3 12h3M18 12h3M5.64 18.36l2.12-2.12M16.24 7.76l2.12-2.12"/>
@@ -141,7 +150,7 @@
           </label>
 
           <label class="theme-option" title="System Preference" part="btn">
-            <input type="radio" name="theme" value="auto" checked>
+            <input type="radio" name="theme" value="auto" checked aria-label="System Preference">
             <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" viewBox="0 0 24 24">
               <path d="M8.46447 15.53553C7.54059 14.65017 7 13.38071 7 12c0-2.76142 2.23858-5 5-5 1.38071 0 2.61036.58047 3.53553 1.46447 2.22452 2.1255-5.17106 8.89186-7.07106 7.07106z"/>
               <path d="M12 3v3M5.64 5.64l2.12 2.12M3 12h3M5.64 18.36l2.12-2.12M16.24 7.76l2.12-2.12"/>
@@ -150,7 +159,7 @@
             </svg>
           </label>
 
-          <label class="theme-option" title="Dark Mode" part="btn">
+          <label class="theme-option" title="Dark Mode" part="btn" aria-label="Dark Mode">
             <input type="radio" name="theme" value="dark">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
@@ -245,6 +254,11 @@
         <option selected value="Roma">Roma</option>
         <option value="Rainbow">Rainbow</option>
       </select>
+    </section>
+
+    <section>
+      <label for="single-component-zoom-checkbox">Show Single Component Zoom?</label>
+      <input type="checkbox" checked id="single-component-zoom-checkbox"/>
     </section>
   </div>
 

@@ -1,4 +1,5 @@
 import { FFTWebGPU } from './WebGPU.js'
+import { HoverTracker } from './HoverTracker.js'
 
 const settings = {
   inputDisplay: {
@@ -43,6 +44,11 @@ const settings = {
     default: [0, 1],
     format: (v) => v.map(x => x * 100),
     parse: (v) => v.map(x => x / 100)
+  },
+  singleComponentZoom: {
+    el: document.getElementById('single-component-zoom-checkbox'),
+    storageKey: 'single-component-zoom',
+    default: true
   }
 }
 
@@ -82,6 +88,11 @@ export class Renderer extends EventTarget {
   async init (canvases, size) {
     this.canvases = canvases
     await this.gpu.init(canvases, size)
+    this.hover = new HoverTracker(
+      canvases.magnitude,
+      canvases.hover,
+      this.#updateHoverCoordinates
+    )
     this.#subscribeToSettingsChanges()
     this.#addSettings()
   }
@@ -167,11 +178,25 @@ export class Renderer extends EventTarget {
       this.#emitDirty()
     })
 
+    this.settings.subscribe('singleComponentZoom', (bool) => {
+      this.hover.active = bool
+      this.gpu.setRenderWave(bool)
+      this.canvases.magnitude.classList.toggle('canvas-hover', bool)
+    })
+
     this.settings.subscribe('lightDark', (val) => {
       const white = [ 1, 1, 1, 1 ]
       const black = [ 0, 0, 0, 1 ]
       this.gpu.setIntegrationPalette(val === 'light' ? { fg: black, bg: white } : { fg: white, bg: black })
       this.#emitDirty()
     })
+  }
+
+  #updateHoverCoordinates = (visible, x, y) => {
+    this.gpu.setRenderWave(visible)
+    if (visible) {
+      this.gpu.setWaveCoordinates(x, y)
+      this.#emitDirty()
+    }
   }
 }

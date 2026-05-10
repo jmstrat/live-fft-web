@@ -656,7 +656,6 @@ export class IntegrationShader extends Shader {
   }
 }
 
-
 export class Float32Downcast extends Shader {
   static filename = 'float32-downcast.wgsl'
 
@@ -695,7 +694,6 @@ export class Float32Downcast extends Shader {
     pass.end()
   }
 }
-
 
 export class RenderTextureShader extends Shader {
   static filename = 'render-ft.wgsl'
@@ -825,6 +823,52 @@ export class RenderProfileShader extends Shader {
   setPalette ({ bg, fg }) {
     this.#backgroundCol = bg
     const arr = new Float32Array(fg)
+    this.device.queue.writeBuffer(this.uniformBuffer, 0, arr)
+  }
+}
+
+export class RenderWaveShader extends Shader {
+  static filename = 'wave.wgsl'
+
+  async init () {
+    const module = await this.fetchShaderModule()
+
+    this.pipeline = await this.createRenderPipeline({
+      layout: 'auto',
+      vertex: { module },
+      fragment: {
+        module,
+        targets: [{ format: this.format }]
+      }
+    })
+
+    this.uniformBuffer = this.device.createBuffer({
+      size: 8,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    })
+    this.uniformResource = { buffer: this.uniformBuffer }
+  }
+
+  run (encoder, ft, output) {
+    const pass = encoder.beginRenderPass({
+      colorAttachments: [{
+        view: output,
+        loadOp: "clear",
+        storeOp: "store"
+      }]
+    })
+    pass.setPipeline(this.pipeline)
+    pass.setBindGroup(0, this.getBindGroup(
+      this.pipeline,
+      ft,
+      this.uniformResource
+    ))
+    pass.draw(3)
+    pass.end()
+  }
+
+  setFrequencyCoordinate (x, y) {
+    const arr = new Float32Array([ x / this.size, y / this.size ])
     this.device.queue.writeBuffer(this.uniformBuffer, 0, arr)
   }
 }
