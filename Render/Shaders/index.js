@@ -709,45 +709,6 @@ export class IntegrationShader extends Shader {
   }
 }
 
-export class Float32Downcast extends Shader {
-  static filename = 'float32-downcast.wgsl'
-
-  active = true
-
-  static getOptionalFeatures (size) {
-    return [ "float32-filterable" ]
-  }
-
-  async init () {
-    // Downcast is not required on modern GPUs
-    if (this.device.features.has("float32-filterable")) {
-      this.run = function noop () {}
-      this.active = false
-      return
-    }
-
-    const module = await this.fetchShaderModule()
-    this.pipeline = await this.createComputePipeline({
-      layout: 'auto',
-      compute: { module }
-    })
-  }
-
-  run (encoder, input, output) {
-    const pipeline = this.pipeline
-    const bindGroup = this.getBindGroup(pipeline, input, output)
-
-    const pass = encoder.beginComputePass()
-    pass.setPipeline(pipeline)
-    pass.setBindGroup(0, bindGroup)
-    pass.dispatchWorkgroups(
-      Math.ceil(this.size / 8),
-      Math.ceil(this.size / 8)
-    )
-    pass.end()
-  }
-}
-
 export class RenderTextureShader extends Shader {
   static filename = 'render-ft.wgsl'
 
@@ -795,9 +756,7 @@ export class RenderTextureShader extends Shader {
       pipeline = pipelines.default
       bindGroup = this.getBindGroup(
         pipelines.default,
-        input,
-        null,
-        this.sampler
+        input
       )
     }
 

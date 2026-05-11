@@ -25,7 +25,7 @@ fn processColour(col: vec4f) -> vec4f {
 
 @fragment
 fn fs(in: VertexOutput) -> @location(0) vec4f {
-  let col = textureSample(tex, samp, in.uv);
+  let col = textureLoad(tex, vec2i(in.position.xy), 0);
   return processColour(col);
 }
 

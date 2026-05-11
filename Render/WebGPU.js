@@ -7,8 +7,6 @@ import {
   IntegrationShader,
   PattersonShader,
 
-  Float32Downcast,
-
   RenderTextureShader,
   RenderProfileShader,
   RenderWaveShader
@@ -52,7 +50,6 @@ export class FFTWebGPU {
     MagnitudeShader,
     IntegrationShader,
     PattersonShader,
-    Float32Downcast,
     RenderTextureShader,
     RenderProfileShader,
     RenderWaveShader
@@ -65,10 +62,8 @@ export class FFTWebGPU {
   #renderWave = false
 
   #additionalOutputMode = 'none'
-  #renderPhase = false
-  #renderInverse = false
 
-  // canvases should be { input, magnitude, phase, integration }
+  // canvases should be { input, magnitude, additional, integration, hover }
   async init (canvases, size) {
     this.size = size
 
@@ -268,18 +263,9 @@ export class FFTWebGPU {
         this.canvases.input.getCurrentTexture().createView()
       )
     } else {
-      const downcast = shaders.get(Float32Downcast)
-      let processedTexture = this.views.fft[ping]
-      if (downcast.active) {
-        // Downcast the processed float32 texture to an 8-bit texture
-        // Only necessary on older GPUs
-        downcast.run(encoder, this.views.fft[ping], this.views.outputExtra)
-        processedTexture = this.views.outputExtra
-      }
-
       shaders.get(RenderTextureShader).runGreyscale(
         encoder,
-        processedTexture,
+        this.views.fft[ping],
         this.canvases.input.getCurrentTexture().createView()
       )
     }
@@ -363,18 +349,9 @@ export class FFTWebGPU {
         encoder, this.views.fft[ping], this.views.fft[pong]
       )
 
-      const downcast = shaders.get(Float32Downcast)
-      let processedTexture = this.views.fft[ping]
-      if (downcast.active) {
-        // Downcast the processed float32 texture to an 8-bit texture
-        // Only necessary on older GPUs
-        downcast.run(encoder, this.views.fft[ping], this.views.outputExtra)
-        processedTexture = this.views.outputExtra
-      }
-
       shaders.get(RenderTextureShader).runGreyscale(
         encoder,
-        processedTexture,
+        this.views.fft[ping],
         this.canvases.additional.getCurrentTexture().createView()
       )
     }
