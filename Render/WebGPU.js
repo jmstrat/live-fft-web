@@ -5,6 +5,7 @@ import {
   MaskShader,
   MagnitudeShader,
   IntegrationShader,
+  PattersonShader,
 
   Float32Downcast,
 
@@ -26,6 +27,13 @@ export class FFTWebGPU {
     processed: 'processed'
   }
 
+  static AdditionalOutput = {
+    none: 'none',
+    phase: 'phase',
+    inverse: 'inverse',
+    patterson: 'patterson'
+  }
+
   static InputConversionMode = {
     ...ConvertShader.WindowFunctions,
     PeriodicPlusSmooth: Symbol()
@@ -43,6 +51,7 @@ export class FFTWebGPU {
     MaskShader,
     MagnitudeShader,
     IntegrationShader,
+    PattersonShader,
     Float32Downcast,
     RenderTextureShader,
     RenderProfileShader,
@@ -53,9 +62,11 @@ export class FFTWebGPU {
   #inputDisplayMode = 'raw'
   #periodicPlusSmooth = false
   #maskEnabled = false
+  #renderWave = false
+
+  #additionalOutputMode = 'none'
   #renderPhase = false
   #renderInverse = false
-  #renderWave = false
 
   // canvases should be { input, magnitude, phase, integration }
   async init (canvases, size) {
@@ -295,6 +306,27 @@ export class FFTWebGPU {
       pong = x
     }
 
+    if (this.#additionalOutputMode === FFTWebGPU.AdditionalOutput.patterson) {
+      shaders.get(PattersonShader).run(
+        encoder,
+        this.views.fft[ping],
+        this.views.greyscaleCopy,
+        this.views.fft[pong]
+      )
+
+      shaders.get(MagnitudeShader).runColouriseReal(
+        encoder,
+        this.views.fft[pong],
+        this.views.outputExtra
+      )
+
+      shaders.get(RenderTextureShader).run(
+        encoder,
+        this.views.outputExtra,
+        this.canvases.additional.getCurrentTexture().createView()
+      )
+    }
+
     shaders.get(MagnitudeShader).run(
       encoder,
       this.views.fft[ping],
@@ -309,7 +341,7 @@ export class FFTWebGPU {
       this.canvases.magnitude.getCurrentTexture().createView()
     )
 
-    if (this.#renderPhase) {
+    if (this.#additionalOutputMode === FFTWebGPU.AdditionalOutput.phase) {
       shaders.get(RenderTextureShader).run(
         encoder,
         this.views.outputExtra,
@@ -326,7 +358,7 @@ export class FFTWebGPU {
       this.canvases.integration.getCurrentTexture().createView()
     )
 
-    if (this.#renderInverse && !this.#renderPhase) {
+    if (this.#additionalOutputMode === FFTWebGPU.AdditionalOutput.inverse) {
       shaders.get(FFTShader).runInverse(
         encoder, this.views.fft[ping], this.views.fft[pong]
       )
@@ -370,13 +402,11 @@ export class FFTWebGPU {
     this.#shaders.get(ConvertShader).setFlipX(bool)
   }
 
-  setRenderPhase (bool) {
-    this.#renderPhase = bool
-    this.#shaders.get(MagnitudeShader).setCalcPhase(bool)
-  }
-
-  setRenderInverse (bool) {
-    this.#renderInverse = bool
+  setAdditionalOutputMode (mode) {
+    this.#additionalOutputMode = mode
+    this.#shaders.get(MagnitudeShader).setCalcPhase(
+      mode === FFTWebGPU.AdditionalOutput.phase
+    )
   }
 
   setMagnitudeColourMap (idx) {

@@ -187,3 +187,20 @@ fn main(@builtin(global_invocation_id) gid : vec3u) {
   let normalized_phase = (phase_val / PI) * 0.5 + 0.5;
   textureStore(phase_rgba, coords, get_phase_colour(normalized_phase));
 }
+
+@compute @workgroup_size(8, 8)
+fn shiftAndColouriseReal(@builtin(global_invocation_id) gid : vec3u) {
+  let dims = textureDimensions(src);
+  let coords = gid.xy;
+
+  if (coords.x >= dims.x || coords.y >= dims.y) {
+    return;
+  }
+
+  let shifted = (coords + dims / 2u) % dims;
+  let val = textureLoad(src, shifted).r;
+  let val_log = log(1.0 + val) / log(10.0);
+
+  let normalized_val = clamp(val_log * params.magnitude_scale, 0.0, 1.0);
+  textureStore(magnitude_rgba, coords, get_mag_colour(normalized_val));
+}

@@ -125,21 +125,19 @@ export class Renderer extends EventTarget {
     })
 
     this.settings.subscribe('additionalOutput', (key) => {
-      this.gpu.setRenderPhase(key === 'Phase')
+      this.gpu.setAdditionalOutputMode(FFTWebGPU.AdditionalOutput[key])
 
-      if (key === 'Inverse') {
-        this.gpu.setRenderInverse(true)
+      if (key === 'inverse') {
         settings.maskRange.el.classList.remove('hidden')
         this.gpu.setMaskEnabled(true)
         this.gpu.setMaskWindow(FFTWebGPU.MaskWindows.HannWindow)
       } else {
-        this.gpu.setRenderInverse(false)
         this.gpu.setMaskEnabled(false)
         settings.maskRange.el.classList.add('hidden')
       }
 
       // Update accessibility attributes
-      if (key !== 'None') {
+      if (key !== 'none') {
         const canvas = this.canvases.additional
         const labels = canvas.querySelectorAll('p')
         for (const el of labels) {
@@ -152,9 +150,12 @@ export class Renderer extends EventTarget {
             el.classList.add('hidden')
           }
         }
+
+        this.#markCanvasActive('additional', true)
+      } else {
+        this.#markCanvasActive('additional', false)
       }
 
-      this.#markCanvasActive('additional', key !== 'None')
       this.#emitDirty()
     })
 

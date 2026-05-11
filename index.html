@@ -49,6 +49,7 @@
   <link rel="preload" as="fetch" crossorigin href="Render/Shaders/periodic-plus-smooth.wgsl">
   <link rel="preload" as="fetch" crossorigin href="Render/Shaders/render-ft.wgsl">
   <link rel="preload" as="fetch" crossorigin href="Render/Shaders/render-plot.wgsl">
+  <link rel="preload" as="fetch" crossorigin href="Render/Shaders/square-magnitude.wgsl">
   <link rel="preload" as="fetch" crossorigin href="Render/Shaders/wave.wgsl">
 
   <link rel="icon" type="image/png" href="favicon/favicon-96x96.png" sizes="96x96"/>
@@ -64,25 +65,30 @@
   <main id="dashboard" class="dashboard">
     <div class="row">
       <canvas id="input-canvas" class="output left"
+        width="512" height="512"
         title="Input image to be Fourier transformed"
         aria-label="Input image to be Fourier transformed" role="img">
         <p>Live visualization of the input signal before Fourier transformation.</p>
       </canvas>
       <canvas id="fft-magnitude" class="output centre-or-right"
+        width="512" height="512"
         title="Fourier transform magnitude"
         aria-label="Fourier transform magnitude" role="img">
           <p>Live visualization of the magnitude of the input signal after Fourier transformation.</p>
       </canvas>
       <canvas id="fft-extra" class="output right hidden"
+        width="512" height="512"
         role="img"
         aria-label="Additional Output (tbd)"
         title="Additional Output (tbd)">
-          <p id="Phase" data-title="Fourier transform phase">Live visualization of the phase of the input signal.</p>
-          <p id="Inverse" data-title="Inverse Fourier transform">Inverse of the Fourier transform.</p>
+          <p id="phase" data-title="Fourier transform phase">Live visualization of the phase of the input signal.</p>
+          <p id="inverse" data-title="Inverse Fourier transform">Inverse of the Fourier transform.</p>
+          <p id="patterson" data-title="Patterson Map">Patterson map (inverse of the squared intensity of Fourier transform with zero phase).</p>
       </canvas>
     </div>
     <div class="row">
       <canvas id="integration-canvas" class="output fw top"
+        width="1204" height="256"
         title="Radial integration of the magnitude"
         aria-label="Radial integration of the magnitude" role="img">
           <p>Live radial integration of the magnitude of the Fourier transformed signal.</p>
@@ -91,6 +97,7 @@
   </main>
 
   <canvas id="hover-canvas" class="output" popover="manual"
+    width="512" height="512"
     title="Fourier transform component"
     aria-label="Fourier transform component" role="img">
       <p>A single component of the Fourier transform.</p>
@@ -239,9 +246,10 @@
     <section>
       <label for="additional-output-select">Additional Output</label>
       <select id="additional-output-select">
-        <option selected value="None">None</option>
-        <option value="Phase">Phase</option>
-        <option value="Inverse">Inverse FT with Mask</option>
+        <option selected value="none">None</option>
+        <option value="phase">Phase</option>
+        <option value="inverse">Inverse FT with Mask</option>
+        <option value="patterson">Patterson Map</option>
       </select>
     </section>
 

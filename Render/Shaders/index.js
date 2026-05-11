@@ -467,7 +467,12 @@ export class MagnitudeShader extends Shader {
     const module = await this.fetchShaderModule()
     this.pipeline = await this.createComputePipeline({
       layout: 'auto',
-      compute: { module }
+      compute: { module, entryPoint: 'main' }
+    })
+
+    this.colourisePipeline = await this.createComputePipeline({
+      layout: 'auto',
+      compute: { module, entryPoint: 'shiftAndColouriseReal' }
     })
 
     this.uniformBuffer = this.device.createBuffer({
@@ -486,6 +491,24 @@ export class MagnitudeShader extends Shader {
       output,
       mag_rgba,
       phase_rgba,
+      this.uniformResource
+    ))
+    pass.dispatchWorkgroups(
+      Math.ceil(this.size / 8),
+      Math.ceil(this.size / 8)
+    )
+    pass.end()
+  }
+
+  runColouriseReal (encoder, input, rgba) {
+    const pass = encoder.beginComputePass()
+    pass.setPipeline(this.colourisePipeline)
+    pass.setBindGroup(0, this.getBindGroup(
+      this.colourisePipeline,
+      input,
+      null,
+      rgba,
+      null,
       this.uniformResource
     ))
     pass.dispatchWorkgroups(
@@ -527,6 +550,36 @@ export class MagnitudeShader extends Shader {
   setCalcPhase (bool) {
     const arr = new Uint32Array([ bool ? 1 : 0 ])
     this.device.queue.writeBuffer(this.uniformBuffer, 8, arr)
+  }
+}
+
+export class PattersonShader extends Shader {
+  static filename = 'square-magnitude.wgsl'
+
+  async init () {
+    const module = await this.fetchShaderModule()
+    this.magSquarePipeline = await this.createComputePipeline({
+      layout: 'auto',
+      compute: { module, entryPoint: 'magSquare' }
+    })
+  }
+
+  run (encoder, input, intermediate, output) {
+    {
+      const pass = encoder.beginComputePass()
+      pass.setPipeline(this.magSquarePipeline)
+      pass.setBindGroup(0, this.getBindGroup(
+        this.magSquarePipeline, input, output
+      ))
+      pass.dispatchWorkgroups(
+        Math.ceil(this.size / 8),
+        Math.ceil(this.size / 8)
+      )
+      pass.end()
+    }
+
+    const fft = this.manager.getShaderInstance(FFTShader)
+    fft.runInverse(encoder, output, intermediate)
   }
 }
 
