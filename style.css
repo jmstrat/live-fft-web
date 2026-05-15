@@ -91,6 +91,9 @@ body {
   border: 4px solid var(--border-colour);
   border-radius: 12px;
   box-sizing: border-box;
+
+  overflow: hidden;
+  contain: paint;
 }
 
 .output.round {
