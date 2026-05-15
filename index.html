@@ -64,19 +64,19 @@
 <body>
   <main id="dashboard" class="dashboard">
     <div class="row">
-      <canvas id="input-canvas" class="output left"
+      <canvas id="input-canvas" class="output left crosshair"
         width="512" height="512"
         title="Input image to be Fourier transformed"
         aria-label="Input image to be Fourier transformed" role="img">
         <p>Live visualization of the input signal before Fourier transformation.</p>
       </canvas>
-      <canvas id="fft-magnitude" class="output centre-or-right"
+      <canvas id="fft-magnitude" class="output centre-or-right crosshair"
         width="512" height="512"
         title="Fourier transform magnitude"
         aria-label="Fourier transform magnitude" role="img">
           <p>Live visualization of the magnitude of the input signal after Fourier transformation.</p>
       </canvas>
-      <canvas id="fft-extra" class="output right hidden"
+      <canvas id="fft-extra" class="output right hidden crosshair"
         width="512" height="512"
         role="img"
         aria-label="Additional Output (tbd)"
@@ -96,11 +96,16 @@
     </div>
   </main>
 
-  <canvas id="hover-canvas" class="output" popover="manual"
+  <canvas id="hover-canvas" class="output hover-canvas" popover="manual"
     width="512" height="512"
     title="Fourier transform component"
     aria-label="Fourier transform component" role="img">
       <p>A single component of the Fourier transform.</p>
+  </canvas>
+
+  <canvas id="loupe-canvas" class="output round hover-canvas" popover="manual"
+    width="45" height="45"
+    aria-hidden="true" role="img">
   </canvas>
 
   <dual-range-input id="ft-mask-range" class="ft-mask-range"
@@ -267,6 +272,11 @@
     <section>
       <label for="single-component-zoom-checkbox">Show Single Component Zoom?</label>
       <input type="checkbox" checked id="single-component-zoom-checkbox"/>
+    </section>
+
+    <section>
+      <label for="loupe-checkbox">Show Loupe?</label>
+      <input type="checkbox" id="loupe-checkbox"/>
     </section>
   </div>
 

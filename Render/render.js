@@ -49,6 +49,11 @@ const settings = {
     el: document.getElementById('single-component-zoom-checkbox'),
     storageKey: 'single-component-zoom',
     default: true
+  },
+  loupe: {
+    el: document.getElementById('loupe-checkbox'),
+    storageKey: 'loupe',
+    default: false
   }
 }
 
@@ -88,10 +93,27 @@ export class Renderer extends EventTarget {
   async init (canvases, size) {
     this.canvases = canvases
     await this.gpu.init(canvases, size)
-    this.hover = new HoverTracker(
+    this.waveHover = new HoverTracker(
       canvases.magnitude,
       canvases.hover,
-      this.#updateHoverCoordinates
+      {
+        callback: this.#updateHoverCoordinates,
+        offset: { x: 0, y: 0 },
+        active: false
+      }
+    )
+    this.loupeHover = new HoverTracker(
+      [
+        canvases.input,
+        canvases.magnitude,
+        canvases.additional
+      ],
+      canvases.loupe,
+      {
+        callback: this.#updateLoupeCoordinates,
+        offset: { x: -50, y: -50 },
+        zIndex: 2
+      }
     )
     this.#subscribeToSettingsChanges()
     this.#addSettings()
@@ -180,9 +202,15 @@ export class Renderer extends EventTarget {
     })
 
     this.settings.subscribe('singleComponentZoom', (bool) => {
-      this.hover.active = bool
+      this.waveHover.active = bool
       this.gpu.setRenderWave(bool)
-      this.canvases.magnitude.classList.toggle('canvas-hover', bool)
+    })
+
+    this.settings.subscribe('loupe', (bool) => {
+      this.loupeHover.active = bool
+      if (!bool) {
+        this.gpu.setLoupeMode(FFTWebGPU.LoupeMode.none)
+      }
     })
 
     this.settings.subscribe('lightDark', (val) => {
@@ -197,6 +225,19 @@ export class Renderer extends EventTarget {
     this.gpu.setRenderWave(visible)
     if (visible) {
       this.gpu.setWaveCoordinates(x, y)
+      this.#emitDirty()
+    }
+  }
+
+  #updateLoupeCoordinates = (visible, x, y, canvas) => {
+    if (!visible) {
+      this.gpu.setLoupeMode(FFTWebGPU.LoupeMode.none)
+    } else {
+      const key = Object.keys(this.canvases)
+                  .find(key => this.canvases[key] === canvas)
+      const mode = FFTWebGPU.LoupeMode[key]
+      this.gpu.setLoupeMode(mode)
+      this.gpu.setLoupePosition(x, y)
       this.#emitDirty()
     }
   }

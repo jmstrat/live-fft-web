@@ -37,6 +37,13 @@ export class FFTWebGPU {
     PeriodicPlusSmooth: Symbol()
   }
 
+  static LoupeMode = {
+    none: 0,
+    input: 1,
+    magnitude: 2,
+    additional: 3
+  }
+
   static MagnitudeColourMap = MagnitudeShader.MagnitudeColourMap
   static PhaseColourMap = MagnitudeShader.PhaseColourMap
 
@@ -60,6 +67,7 @@ export class FFTWebGPU {
   #periodicPlusSmooth = false
   #maskEnabled = false
   #renderWave = false
+  #loupeMode = 0
 
   #additionalOutputMode = 'none'
 
@@ -70,7 +78,8 @@ export class FFTWebGPU {
     // Static configuration (never changes)
     const config = {
       maxIntegrationRadius: (size / 2) - 1,
-      integrationBins: canvases.integration.width
+      integrationBins: canvases.integration.width,
+      cropTargetSize: canvases.loupe.width
     }
 
     await this.#getDevice()
@@ -262,12 +271,26 @@ export class FFTWebGPU {
         source,
         this.canvases.input.getCurrentTexture().createView()
       )
+      if (this.#loupeMode === FFTWebGPU.LoupeMode.input) {
+        shaders.get(RenderTextureShader).runCropped(
+          encoder,
+          source,
+          this.canvases.loupe.getCurrentTexture().createView()
+        )
+      }
     } else {
       shaders.get(RenderTextureShader).runGreyscale(
         encoder,
         this.views.fft[ping],
         this.canvases.input.getCurrentTexture().createView()
       )
+      if (this.#loupeMode === FFTWebGPU.LoupeMode.input) {
+        shaders.get(RenderTextureShader).runCroppedGreyscale(
+          encoder,
+          this.views.fft[ping],
+          this.canvases.loupe.getCurrentTexture().createView()
+        )
+      }
     }
 
     shaders.get(FFTShader).run(encoder, this.views.fft[ping], this.views.fft[pong])
@@ -311,6 +334,14 @@ export class FFTWebGPU {
         this.views.outputExtra,
         this.canvases.additional.getCurrentTexture().createView()
       )
+
+      if (this.#loupeMode === FFTWebGPU.LoupeMode.additional) {
+        shaders.get(RenderTextureShader).runCropped(
+          encoder,
+          this.views.outputExtra,
+          this.canvases.loupe.getCurrentTexture().createView()
+        )
+      }
     }
 
     shaders.get(MagnitudeShader).run(
@@ -327,12 +358,28 @@ export class FFTWebGPU {
       this.canvases.magnitude.getCurrentTexture().createView()
     )
 
+    if (this.#loupeMode === FFTWebGPU.LoupeMode.magnitude) {
+      shaders.get(RenderTextureShader).runCropped(
+        encoder,
+        this.views.outputMagnitude,
+        this.canvases.loupe.getCurrentTexture().createView()
+      )
+    }
+
     if (this.#additionalOutputMode === FFTWebGPU.AdditionalOutput.phase) {
       shaders.get(RenderTextureShader).run(
         encoder,
         this.views.outputExtra,
         this.canvases.additional.getCurrentTexture().createView()
       )
+
+      if (this.#loupeMode === FFTWebGPU.LoupeMode.additional) {
+        shaders.get(RenderTextureShader).runCropped(
+          encoder,
+          this.views.outputExtra,
+          this.canvases.loupe.getCurrentTexture().createView()
+        )
+      }
     }
 
     shaders.get(IntegrationShader).run(encoder, this.views.fft[pong])
@@ -354,6 +401,14 @@ export class FFTWebGPU {
         this.views.fft[ping],
         this.canvases.additional.getCurrentTexture().createView()
       )
+
+      if (this.#loupeMode === FFTWebGPU.LoupeMode.additional) {
+        shaders.get(RenderTextureShader).runCroppedGreyscale(
+          encoder,
+          this.views.fft[ping],
+          this.canvases.loupe.getCurrentTexture().createView()
+        )
+      }
     }
 
     this.device.queue.submit([encoder.finish()])
@@ -420,5 +475,13 @@ export class FFTWebGPU {
 
   setWaveCoordinates (x, y) {
     this.#shaders.get(RenderWaveShader).setFrequencyCoordinate(x, y)
+  }
+
+  setLoupeMode (idx) {
+    this.#loupeMode = idx
+  }
+
+  setLoupePosition (x, y) {
+    this.#shaders.get(RenderTextureShader).setCropCoordinates(x, y)
   }
 }

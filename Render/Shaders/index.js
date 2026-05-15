@@ -719,7 +719,7 @@ export class RenderTextureShader extends Shader {
       minFilter: "linear"
     })
 
-    const makePipeline = async (entryPoint, GREYSCALE) =>
+    const makePipeline = async (entryPoint, constants) =>
       await this.createRenderPipeline({
         layout: 'auto',
         vertex: { module },
@@ -727,22 +727,41 @@ export class RenderTextureShader extends Shader {
           module,
           targets: [{ format: this.format }],
           entryPoint,
-          constants: { GREYSCALE }
+          constants
         }
       })
 
     this.colourPipelines = {
-      default: await makePipeline('fs', false),
-      external: await makePipeline('fs_external', false)
+      default: await makePipeline('fs', { GREYSCALE: false }),
+      external: await makePipeline('fs_external', { GREYSCALE: false })
     }
 
     this.greyscalePipelines = {
-      default: await makePipeline('fs', true),
-      external: await makePipeline('fs_external', true)
+      default: await makePipeline('fs', { GREYSCALE: true }),
+      external: await makePipeline('fs_external', { GREYSCALE: true })
     }
+
+    const TARGET_ZOOM = 9
+    const TARGET_CENTRE = Math.floor(this.config.cropTargetSize / (2 * TARGET_ZOOM))
+
+    this.cropColourPipelines = {
+      default: await makePipeline('fs_crop', { GREYSCALE: false, TARGET_CENTRE, TARGET_ZOOM }),
+      external: await makePipeline('fs_external_crop', { GREYSCALE: false, TARGET_CENTRE, TARGET_ZOOM })
+    }
+
+    this.cropGreyscalePipelines = {
+      default: await makePipeline('fs_crop', { GREYSCALE: true, TARGET_CENTRE, TARGET_ZOOM }),
+      external: await makePipeline('fs_external_crop', { GREYSCALE: true, TARGET_CENTRE, TARGET_ZOOM })
+    }
+
+    this.cropUniformBuffer = this.device.createBuffer({
+      size: 16,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    })
+    this.cropUniformResource = { buffer: this.cropUniformBuffer }
   }
 
-  #run (pipelines, encoder, input, output) {
+  #run (pipelines, encoder, input, output, withUniforms=false) {
     let pipeline, bindGroup
     if (input instanceof GPUExternalTexture) {
       pipeline = pipelines.external
@@ -750,13 +769,17 @@ export class RenderTextureShader extends Shader {
         pipelines.external,
         null,
         input,
-        this.sampler
+        this.sampler,
+        withUniforms ? this.cropUniformResource : null
       )
     } else {
       pipeline = pipelines.default
       bindGroup = this.getBindGroup(
         pipelines.default,
-        input
+        input,
+        null,
+        null,
+        withUniforms ? this.cropUniformResource : null
       )
     }
 
@@ -779,6 +802,21 @@ export class RenderTextureShader extends Shader {
 
   runGreyscale (encoder, input, output) {
     this.#run(this.greyscalePipelines, encoder, input, output)
+  }
+
+  runCropped (encoder, input, output) {
+    this.#run(this.cropColourPipelines, encoder, input, output, true)
+  }
+
+  runCroppedGreyscale (encoder, input, output) {
+    this.#run(this.cropGreyscalePipelines, encoder, input, output, true)
+  }
+
+  setCropCoordinates (x, y) {
+    const arr = new Int32Array(2)
+    arr[0] = x
+    arr[1] = y
+    this.device.queue.writeBuffer(this.cropUniformBuffer, 0, arr)
   }
 }
 

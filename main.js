@@ -46,7 +46,8 @@ const canvases = {
   magnitude: document.getElementById('fft-magnitude'),
   additional: document.getElementById('fft-extra'),
   integration: document.getElementById('integration-canvas'),
-  hover: document.getElementById('hover-canvas')
+  hover: document.getElementById('hover-canvas'),
+  loupe: document.getElementById('loupe-canvas')
 }
 
 const elements = {
@@ -81,7 +82,7 @@ async function init () {
 }
 
 function setCanvasSizes () {
-  const { integration, ...squareCanvases } = canvases
+  const { integration, loupe, ...squareCanvases } = canvases
   for (const c of Object.values(squareCanvases)) {
     c.width = c.height = SIZE
   }
