@@ -4,7 +4,7 @@
 const PI: f32 = acos(-1.0);
 
 struct Params {
-  frequency_coords: vec2f
+  frequency_coords: vec2u
 };
 
 struct VertexOutput {
@@ -23,7 +23,7 @@ fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
   let pos = vec4f(uv * 2.0 - 1.0, 0.0, 1.0);
 
   let dims = textureDimensions(tex_fft);
-  let coords = vec2u(params.frequency_coords * vec2f(dims));
+  let coords = params.frequency_coords;
   let shifted = (coords + dims / 2u) % dims;
   let frequency_value = normalize(textureLoad(tex_fft, shifted, 0).xy);
 

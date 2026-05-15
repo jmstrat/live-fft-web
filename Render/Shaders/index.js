@@ -918,7 +918,9 @@ export class RenderWaveShader extends Shader {
   }
 
   setFrequencyCoordinate (x, y) {
-    const arr = new Float32Array([ x / this.size, y / this.size ])
+    const arr = new Uint32Array(2)
+    arr[0] = x
+    arr[1] = y
     this.device.queue.writeBuffer(this.uniformBuffer, 0, arr)
   }
 }
