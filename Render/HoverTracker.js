@@ -100,11 +100,21 @@ export class HoverTracker {
 
   #emitCoords (e, currentTarget) {
     const rect = currentTarget.getBoundingClientRect()
-    const horizontalPercent = (e.clientX - rect.left) / rect.width
-    const verticalPercent = (e.clientY - rect.top) / rect.height
+    const style = window.getComputedStyle(currentTarget)
 
-    const x = Math.floor(horizontalPercent * currentTarget.width)
-    const y = Math.floor(verticalPercent * currentTarget.height)
+    const pLeft = parseFloat(style.paddingLeft)
+    const pTop = parseFloat(style.paddingTop)
+    const pRight = parseFloat(style.paddingRight)
+    const pBottom = parseFloat(style.paddingBottom)
+
+    const contentWidth = currentTarget.clientWidth - pLeft - pRight
+    const contentHeight = currentTarget.clientHeight - pTop - pBottom
+    const canvasX = e.clientX - rect.left - currentTarget.clientLeft - pLeft
+    const canvasY = e.clientY - rect.top - currentTarget.clientTop - pTop
+
+    const x = Math.floor((canvasX / contentWidth) * currentTarget.width)
+    const y = Math.floor((canvasY / contentHeight) * currentTarget.height)
+
     this.#callback?.(true, x, y, currentTarget)
   }
 
