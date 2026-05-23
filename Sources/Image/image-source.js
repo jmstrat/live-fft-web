@@ -16,6 +16,7 @@ export class ImageSource extends Source {
 
   #cache
   #drag = new DragAndDropManager()
+  #isActive = false
 
   async init (size) {
     this.#cache = new ImageCache(size, size)
@@ -40,10 +41,12 @@ export class ImageSource extends Source {
 
   async activate () {
     this.#settingsEl.classList.remove('hidden')
+    this.#isActive = true
     this.#warnIfNoImages()
   }
 
   deactivate () {
+    this.#isActive = false
     this.#settingsEl.classList.add('hidden')
     this.#overlays.noImages.classList.add('hidden')
   }
@@ -85,6 +88,9 @@ export class ImageSource extends Source {
   }
 
   #warnIfNoImages () {
+    if (!this.#isActive) {
+      return
+    }
     const size = this.#cache.size
     if (size < 1) {
       this.#overlays.noImages.classList.remove('hidden')
