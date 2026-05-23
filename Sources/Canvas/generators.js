@@ -81,6 +81,46 @@ class Generator {
   }
 }
 
+class Step extends Generator {
+  render () {
+    const { angle, offset } = this.config
+
+    const centreX = this.width / 2
+    const centreY = this.height / 2
+
+    const normalX = Math.cos(angle)
+    const normalY = Math.sin(angle)
+    const tangentX = -normalY
+    const tangentY = normalX
+
+    const viewScale = Math.max(this.width, this.height) * 2
+    const boundaryX = centreX + normalX * offset
+    const boundaryY = centreY + normalY * offset
+
+    this.ctx.beginPath()
+    this.ctx.moveTo(
+      boundaryX - tangentX * viewScale,
+      boundaryY - tangentY * viewScale
+    )
+    this.ctx.lineTo(
+      boundaryX + tangentX * viewScale,
+      boundaryY + tangentY * viewScale
+    )
+    this.ctx.lineTo(
+      boundaryX + tangentX * viewScale + normalX * viewScale,
+      boundaryY + tangentY * viewScale + normalY * viewScale
+    )
+    this.ctx.lineTo(
+      boundaryX - tangentX * viewScale + normalX * viewScale,
+      boundaryY - tangentY * viewScale + normalY * viewScale
+    )
+    this.ctx.closePath()
+
+    this.ctx.fillStyle = this.palette.fg
+    this.ctx.fill()
+  }
+}
+
 class Circle extends Generator {
   render () {
     const { sizeFactor, pulseAmplitude } = this.config
@@ -378,6 +418,10 @@ class Lattice extends Circles {
 }
 
 export const Generators = {
+  Step: new Step({
+    angle: 0,
+    offset: 0
+  }),
   Circle: new Circle({
     sizeFactor: 0.05,
     pulseAmplitude: 0.9,
