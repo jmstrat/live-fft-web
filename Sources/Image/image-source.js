@@ -15,7 +15,7 @@ export class ImageSource extends Source {
   #lastDrawnImage = null
 
   #cache
-  #drag = new DragAndDropManager()
+  #drag = new DragAndDropManager({ accept: ['image/*'] })
   #isActive = false
 
   async init (size) {
